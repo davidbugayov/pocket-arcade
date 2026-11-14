@@ -24,57 +24,57 @@ class_name MainMenu
 func _ready() -> void:
 	GameManager.coins_changed.connect(_on_coins_changed)
 	GameManager.upgrades_changed.connect(_on_upgrades_changed)
-	
+
 	lvl1_btn.pressed.connect(func(): _start_level(1))
 	lvl2_btn.pressed.connect(func(): _start_level(2))
 	lvl3_btn.pressed.connect(func(): _start_level(3))
-	
+
 	upg_squad_btn.pressed.connect(func(): _buy_upgrade("squad"))
 	upg_dmg_btn.pressed.connect(func(): _buy_upgrade("damage"))
 	upg_fire_btn.pressed.connect(func(): _buy_upgrade("fire_rate"))
-	
+
 	sound_btn.pressed.connect(_on_sound_toggled)
-	
+
 	_setup_weapon_buttons()
 	_refresh_ui()
 
 func _refresh_ui() -> void:
 	coins_label.text = str(GameManager.coins)
 	sound_btn.text = "SOUND: ON" if GameManager.sound_enabled else "SOUND: OFF"
-	
+
 	# Level buttons
 	var unl = GameManager.highest_unlocked_level
 	lvl1_btn.disabled = false
 	lvl2_btn.disabled = (unl < 2)
 	lvl3_btn.disabled = (unl < 3)
-	
+
 	lvl2_btn.text = "LEVEL 2" if unl >= 2 else "LOCKED (LVL 2)"
 	lvl3_btn.text = "LEVEL 3" if unl >= 3 else "LOCKED (LVL 3)"
-	
+
 	# Upgrade Squad Size
 	var sq_cost = GameManager.get_upgrade_cost("squad")
 	upg_squad_lbl.text = "Squad Size: " + str(GameManager.get_starting_squad_size())
 	upg_squad_btn.text = str(sq_cost) + " COINS"
 	upg_squad_btn.disabled = (GameManager.coins < sq_cost)
-	
+
 	# Upgrade Damage
 	var dmg_cost = GameManager.get_upgrade_cost("damage")
 	upg_dmg_lbl.text = "Damage: +" + str(GameManager.upgrade_damage * 25) + "%"
 	upg_dmg_btn.text = str(dmg_cost) + " COINS"
 	upg_dmg_btn.disabled = (GameManager.coins < dmg_cost)
-	
+
 	# Upgrade Fire Rate
 	var fire_cost = GameManager.get_upgrade_cost("fire_rate")
 	upg_fire_lbl.text = "Fire Rate: +" + str(GameManager.upgrade_fire_rate * 12) + "%"
 	upg_fire_btn.text = str(fire_cost) + " COINS"
 	upg_fire_btn.disabled = (GameManager.coins < fire_cost)
-	
+
 	_update_weapon_buttons_state()
 
 func _setup_weapon_buttons() -> void:
 	for child in weapon_tab.get_children():
 		child.queue_free()
-	
+
 	for i in range(GameManager.WEAPON_DATA.size()):
 		var wdata = GameManager.WEAPON_DATA[i]
 		var btn = Button.new()
@@ -90,7 +90,7 @@ func _update_weapon_buttons_state() -> void:
 		var wdata = GameManager.WEAPON_DATA[i]
 		var is_unlocked = (i in GameManager.unlocked_weapons)
 		var is_selected = (i == GameManager.current_weapon_index)
-		
+
 		if is_selected:
 			btn.text = wdata["name"] + "\n[EQUIPPED]"
 			btn.modulate = Color(0.2, 1.0, 0.4)
@@ -131,4 +131,3 @@ func _on_coins_changed(_new_coins: int) -> void:
 
 func _on_upgrades_changed() -> void:
 	_refresh_ui()
-

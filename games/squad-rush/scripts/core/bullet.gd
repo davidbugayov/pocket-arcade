@@ -17,7 +17,7 @@ func _ready() -> void:
 	_apply_collision_settings()
 	monitoring = true
 	monitorable = true
-	
+
 	_create_visuals()
 	area_entered.connect(_on_area_entered)
 	body_entered.connect(_on_body_entered)
@@ -39,9 +39,9 @@ func setup(p_damage: float, p_speed: float, p_dir: Vector3, p_color: Color, p_is
 	speed = p_speed
 	direction = p_dir.normalized()
 	is_player_bullet = p_is_player
-	
+
 	_apply_collision_settings()
-	
+
 	if mesh_instance and mesh_instance.material_override:
 		var mat = mesh_instance.material_override as StandardMaterial3D
 		mat.albedo_color = p_color
@@ -56,14 +56,14 @@ func _create_visuals() -> void:
 		cap.height = 0.45 if not is_player_bullet else 0.4
 		mesh_instance.mesh = cap
 		mesh_instance.rotation_degrees.x = 90
-		
+
 		var mat = StandardMaterial3D.new()
 		mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
 		var init_col = Color(0.2, 0.9, 1.0) if is_player_bullet else Color(1.0, 0.3, 0.1)
 		mat.albedo_color = init_col
 		mesh_instance.material_override = mat
 		add_child(mesh_instance)
-	
+
 	if collision_shape == null:
 		collision_shape = CollisionShape3D.new()
 		var shape = SphereShape3D.new()
@@ -81,7 +81,7 @@ func _physics_process(delta: float) -> void:
 func _on_area_entered(area: Area3D) -> void:
 	if has_hit:
 		return
-	
+
 	if is_player_bullet:
 		# Player bullet can only hit enemies/boss (EnemyUnit and BossUnit are Area3D)
 		if area is EnemyUnit or area is BossUnit:
@@ -104,7 +104,7 @@ func _on_area_entered(area: Area3D) -> void:
 func _on_body_entered(body: Node3D) -> void:
 	if has_hit:
 		return
-	
+
 	if is_player_bullet:
 		# Player bullet: NEVER hurt player squad
 		if body is PlayerSquad:

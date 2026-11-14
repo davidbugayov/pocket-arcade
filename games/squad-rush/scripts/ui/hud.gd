@@ -42,20 +42,20 @@ func _ready() -> void:
 	boss_container.visible = false
 	pause_overlay.visible = false
 	game_over_overlay.visible = false
-	
+
 	_create_damage_flash_overlay()
 	_create_toast_ui()
-	
+
 	pause_button.pressed.connect(_on_pause_pressed)
 	$PauseOverlay/VBox/ResumeBtn.pressed.connect(_on_resume_pressed)
 	$PauseOverlay/VBox/RestartBtn.pressed.connect(_on_restart_pressed)
 	$PauseOverlay/VBox/MenuBtn.pressed.connect(_on_menu_pressed)
 	sound_btn.pressed.connect(_on_sound_toggled)
-	
+
 	next_btn.pressed.connect(func(): next_level_requested.emit())
 	retry_btn.pressed.connect(func(): restart_requested.emit())
 	menu_btn.pressed.connect(func(): menu_requested.emit())
-	
+
 	_update_sound_btn_text()
 
 func _create_damage_flash_overlay() -> void:
@@ -106,26 +106,26 @@ func setup_level(level: LevelBase) -> void:
 	level_label.text = "LEVEL " + str(level.level_number)
 	start_z = 0.0
 	end_z = level.boss_z_position
-	
+
 	boss_container.visible = false
 	pause_overlay.visible = false
 	game_over_overlay.visible = false
-	
+
 	level.level_won.connect(show_victory)
 	level.level_lost.connect(show_defeat)
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(level_controller) or not is_instance_valid(level_controller.player_squad):
 		return
-	
+
 	var cur_z = level_controller.player_squad.position.z
 	var total_dist = abs(end_z - start_z)
 	var covered = abs(cur_z - start_z)
 	var pct = clampf((covered / total_dist) * 100.0, 0.0, 100.0)
 	progress_bar.value = pct
-	
+
 	coins_label.text = str(GameManager.run_coins)
-	
+
 	fps_log_timer += delta
 	if fps_log_timer >= 1.0:
 		fps_log_timer = 0.0
@@ -149,7 +149,7 @@ func show_victory() -> void:
 	game_over_title.modulate = Color(0.2, 1.0, 0.4)
 	game_over_subtitle.text = "LEVEL COMPLETE"
 	game_over_coins.text = "Coins Earned: +" + str(GameManager.run_coins)
-	
+
 	next_btn.visible = (level_controller.level_number < 3)
 	game_over_overlay.visible = true
 

@@ -35,7 +35,7 @@ func _ready() -> void:
 	_setup_player()
 	_build_level_layout()
 	_setup_boss()
-	
+
 	is_game_active = true
 	is_level_completed = false
 
@@ -43,45 +43,50 @@ func _setup_containers() -> void:
 	bullets_container = Node3D.new()
 	bullets_container.name = "Bullets"
 	add_child(bullets_container)
-	
+
 	obstacles_container = Node3D.new()
 	obstacles_container.name = "Obstacles"
 	add_child(obstacles_container)
-	
+
 	gates_container = Node3D.new()
 	gates_container.name = "Gates"
 	add_child(gates_container)
-	
+
 	enemies_container = Node3D.new()
 	enemies_container.name = "Enemies"
 	add_child(enemies_container)
 
 func _setup_environment() -> void:
-	# Directional sun - balanced so road deck is never blown-out white
+	# Directional sun - balanced warm sunlight
 	var sun = DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-50, 30, 0)
-	sun.light_color = Color(1.0, 0.97, 0.92)
-	sun.light_energy = 0.95
+	sun.rotation_degrees = Vector3(-48, 28, 0)
+	sun.light_color = Color(1.0, 0.98, 0.94)
+	sun.light_energy = 0.92
 	sun.shadow_enabled = true
 	add_child(sun)
-	
+
 	var world_env = WorldEnvironment.new()
 	var env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	# Saturated sky blue - cuts down on bleached sky
-	env.background_color = Color(0.30, 0.58, 0.86)
+	# Balanced coastal azure sky
+	env.background_color = Color(0.24, 0.52, 0.82)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.68, 0.78, 0.88)
-	env.ambient_light_energy = 0.42
+	env.ambient_light_color = Color(0.62, 0.74, 0.88)
+	env.ambient_light_energy = 0.40
+	# Subtle horizon fog for depth and seamless water/sky blending
+	env.fog_enabled = true
+	env.fog_light_color = Color(0.36, 0.60, 0.82)
+	env.fog_density = 0.003
+	env.fog_sky_affect = 0.35
 	world_env.environment = env
 	add_child(world_env)
 
 func _setup_camera() -> void:
 	camera = Camera3D.new()
-	# Closer camera with moderate FOV brings the squad and targets up close
-	camera.fov = 54.0
-	camera.position = Vector3(0, 5.2, 6.8)
-	camera.rotation_degrees = Vector3(-26.0, 0, 0)
+	# Closer camera with focused 49 FOV brings action up close, cuts out empty sky
+	camera.fov = 49.0
+	camera.position = Vector3(0, 4.6, 5.8)
+	camera.rotation_degrees = Vector3(-23.5, 0, 0)
 	add_child(camera)
 
 func _setup_track() -> void:
@@ -94,7 +99,7 @@ func _setup_player() -> void:
 	player_squad.position = Vector3(0, 0, 0)
 	player_squad.add_to_group("player")
 	add_child(player_squad)
-	
+
 	player_squad.bullet_spawn_requested.connect(_on_bullet_spawn_requested)
 	player_squad.squad_defeated.connect(_on_player_defeated)
 	player_squad.squad_count_changed.connect(_on_squad_count_changed)
@@ -114,7 +119,7 @@ func _process(delta: float) -> void:
 			player_squad.position.y + 5.2,
 			player_squad.position.z + 6.8
 		)
-		
+
 		# Camera shake offset
 		if camera_shake_trauma > 0.0:
 			camera_shake_trauma = maxf(0.0, camera_shake_trauma - delta * 4.0)
@@ -124,9 +129,9 @@ func _process(delta: float) -> void:
 				randf_range(-0.10, 0.10) * camera_shake_trauma
 			)
 			target_pos += shake_offset
-		
+
 		camera.position = camera.position.lerp(target_pos, delta * 12.0)
-		
+
 		if is_instance_valid(boss) and not is_boss_phase and is_game_active:
 			if player_squad.position.z <= boss_z_position + 42.0:
 				_start_boss_battle()
@@ -177,12 +182,12 @@ func spawn_gate_pair(z_pos: float, left_op: MathGate.OperationType, left_val: in
 	left_gate.position = Vector3(-2.1, 0, z_pos)
 	gates_container.add_child(left_gate)
 	left_gate.setup(left_op, left_val, true)
-	
+
 	var right_gate = MathGate.new()
 	right_gate.position = Vector3(2.1, 0, z_pos)
 	gates_container.add_child(right_gate)
 	right_gate.setup(right_op, right_val, false)
-	
+
 	left_gate.partner_gate = right_gate
 	right_gate.partner_gate = left_gate
 

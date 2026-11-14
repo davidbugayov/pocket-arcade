@@ -16,7 +16,7 @@ func _ready() -> void:
 		p.bus = &"Master"
 		add_child(p)
 		players.append(p)
-	
+
 	_generate_all_sounds()
 
 func _generate_all_sounds() -> void:
@@ -39,7 +39,7 @@ func play(sound_name: String, pitch_rnd: float = 0.05) -> void:
 		return
 	if players.is_empty():
 		return
-	
+
 	var p = players[player_index]
 	player_index = (player_index + 1) % POOL_SIZE
 	p.stream = streams[sound_name]
@@ -52,7 +52,7 @@ func _synth_shoot(start_freq: float, end_freq: float, duration: float, volume: f
 	var total_samples = int(rate * duration)
 	var bytes = PackedByteArray()
 	bytes.resize(total_samples)
-	
+
 	var phase = 0.0
 	for i in range(total_samples):
 		var t = float(i) / float(total_samples)
@@ -65,7 +65,7 @@ func _synth_shoot(start_freq: float, end_freq: float, duration: float, volume: f
 			sample = lerpf(sample, (randf() * 2.0 - 1.0) * env * volume, 0.4)
 		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
 		bytes[i] = byte_val
-	
+
 	return _make_wav(bytes, rate)
 
 func _synth_shotgun(start_freq: float, end_freq: float, duration: float, volume: float) -> AudioStreamWAV:
@@ -73,7 +73,7 @@ func _synth_shotgun(start_freq: float, end_freq: float, duration: float, volume:
 	var total_samples = int(rate * duration)
 	var bytes = PackedByteArray()
 	bytes.resize(total_samples)
-	
+
 	var phase = 0.0
 	for i in range(total_samples):
 		var t = float(i) / float(total_samples)
@@ -84,7 +84,7 @@ func _synth_shotgun(start_freq: float, end_freq: float, duration: float, volume:
 		var sample = (sin(phase) * 0.4 + noise * 0.6) * env * volume
 		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
 		bytes[i] = byte_val
-	
+
 	return _make_wav(bytes, rate)
 
 func _synth_explosion(duration: float, volume: float) -> AudioStreamWAV:
@@ -92,7 +92,7 @@ func _synth_explosion(duration: float, volume: float) -> AudioStreamWAV:
 	var total_samples = int(rate * duration)
 	var bytes = PackedByteArray()
 	bytes.resize(total_samples)
-	
+
 	var low_phase = 0.0
 	for i in range(total_samples):
 		var t = float(i) / float(total_samples)
@@ -103,7 +103,7 @@ func _synth_explosion(duration: float, volume: float) -> AudioStreamWAV:
 		var sample = (rumble + noise * 0.7) * env * volume
 		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
 		bytes[i] = byte_val
-	
+
 	return _make_wav(bytes, rate)
 
 func _synth_noise(duration: float, volume: float, high_pass: bool = false) -> AudioStreamWAV:
@@ -111,7 +111,7 @@ func _synth_noise(duration: float, volume: float, high_pass: bool = false) -> Au
 	var total_samples = int(rate * duration)
 	var bytes = PackedByteArray()
 	bytes.resize(total_samples)
-	
+
 	var last = 0.0
 	for i in range(total_samples):
 		var t = float(i) / float(total_samples)
@@ -123,7 +123,7 @@ func _synth_noise(duration: float, volume: float, high_pass: bool = false) -> Au
 		var sample = val * (1.0 - t) * volume
 		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
 		bytes[i] = byte_val
-	
+
 	return _make_wav(bytes, rate)
 
 func _synth_gate_positive() -> AudioStreamWAV:
@@ -132,10 +132,10 @@ func _synth_gate_positive() -> AudioStreamWAV:
 	var total_samples = int(rate * duration)
 	var bytes = PackedByteArray()
 	bytes.resize(total_samples)
-	
+
 	var freqs = [523.25, 659.25, 783.99, 1046.5] # C5, E5, G5, C6
 	var segment = total_samples / freqs.size()
-	
+
 	var phase = 0.0
 	for i in range(total_samples):
 		var seg_idx = clampi(i / segment, 0, freqs.size() - 1)
@@ -146,7 +146,7 @@ func _synth_gate_positive() -> AudioStreamWAV:
 		var sample = sin(phase) * env * 0.6
 		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
 		bytes[i] = byte_val
-	
+
 	return _make_wav(bytes, rate)
 
 func _synth_gate_negative() -> AudioStreamWAV:
@@ -155,7 +155,7 @@ func _synth_gate_negative() -> AudioStreamWAV:
 	var total_samples = int(rate * duration)
 	var bytes = PackedByteArray()
 	bytes.resize(total_samples)
-	
+
 	var phase = 0.0
 	for i in range(total_samples):
 		var t = float(i) / float(total_samples)
@@ -165,7 +165,7 @@ func _synth_gate_negative() -> AudioStreamWAV:
 		var sample = (sin(phase) + 0.3 * sin(phase * 2.0)) * env * 0.7
 		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
 		bytes[i] = byte_val
-	
+
 	return _make_wav(bytes, rate)
 
 func _synth_coin() -> AudioStreamWAV:
@@ -174,7 +174,7 @@ func _synth_coin() -> AudioStreamWAV:
 	var total_samples = int(rate * duration)
 	var bytes = PackedByteArray()
 	bytes.resize(total_samples)
-	
+
 	var phase = 0.0
 	var half = total_samples / 2
 	for i in range(total_samples):
@@ -185,7 +185,7 @@ func _synth_coin() -> AudioStreamWAV:
 		var sample = sin(phase) * env * 0.55
 		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
 		bytes[i] = byte_val
-	
+
 	return _make_wav(bytes, rate)
 
 func _synth_victory() -> AudioStreamWAV:
@@ -194,7 +194,7 @@ func _synth_victory() -> AudioStreamWAV:
 	var total_samples = int(rate * duration)
 	var bytes = PackedByteArray()
 	bytes.resize(total_samples)
-	
+
 	var notes = [523.25, 659.25, 783.99, 1046.5, 1318.5]
 	var seg = total_samples / notes.size()
 	var phase = 0.0
@@ -206,7 +206,7 @@ func _synth_victory() -> AudioStreamWAV:
 		var sample = sin(phase) * env * 0.65
 		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
 		bytes[i] = byte_val
-	
+
 	return _make_wav(bytes, rate)
 
 func _synth_defeat() -> AudioStreamWAV:
@@ -215,7 +215,7 @@ func _synth_defeat() -> AudioStreamWAV:
 	var total_samples = int(rate * duration)
 	var bytes = PackedByteArray()
 	bytes.resize(total_samples)
-	
+
 	var phase = 0.0
 	for i in range(total_samples):
 		var t = float(i) / float(total_samples)
@@ -225,7 +225,7 @@ func _synth_defeat() -> AudioStreamWAV:
 		var sample = (sin(phase) + 0.2 * (randf() * 2.0 - 1.0)) * env * 0.7
 		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
 		bytes[i] = byte_val
-	
+
 	return _make_wav(bytes, rate)
 
 func _synth_click() -> AudioStreamWAV:
@@ -234,7 +234,7 @@ func _synth_click() -> AudioStreamWAV:
 	var total_samples = int(rate * duration)
 	var bytes = PackedByteArray()
 	bytes.resize(total_samples)
-	
+
 	var phase = 0.0
 	for i in range(total_samples):
 		var t = float(i) / float(total_samples)
@@ -243,7 +243,7 @@ func _synth_click() -> AudioStreamWAV:
 		var sample = sin(phase) * env * 0.4
 		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
 		bytes[i] = byte_val
-	
+
 	return _make_wav(bytes, rate)
 
 func _make_wav(bytes: PackedByteArray, rate: int) -> AudioStreamWAV:
@@ -253,4 +253,3 @@ func _make_wav(bytes: PackedByteArray, rate: int) -> AudioStreamWAV:
 	wav.stereo = false
 	wav.data = bytes
 	return wav
-

@@ -164,17 +164,17 @@ func _sanitize_state() -> Dictionary:
 	upgrade_damage = clampi(upgrade_damage, 0, 50)
 	upgrade_fire_rate = clampi(upgrade_fire_rate, 0, 50)
 	current_weapon_index = clampi(current_weapon_index, 0, WEAPON_DATA.size() - 1)
-	
+
 	if 0 not in unlocked_weapons:
 		unlocked_weapons.append(0)
-	
+
 	var clean_weapons: Array[int] = []
 	for w in unlocked_weapons:
 		var wid = int(w)
 		if wid >= 0 and wid < WEAPON_DATA.size() and wid not in clean_weapons:
 			clean_weapons.append(wid)
 	unlocked_weapons = clean_weapons
-	
+
 	return {
 		"coins": coins,
 		"highest_unlocked_level": highest_unlocked_level,
@@ -189,7 +189,7 @@ func _sanitize_state() -> Dictionary:
 func save_game() -> void:
 	var data = _sanitize_state()
 	var json_str = JSON.stringify(data, "  ")
-	
+
 	# Atomic write: write to temp file first, then atomically rename to avoid partial writes
 	var temp_file = FileAccess.open(TEMP_SAVE_PATH, FileAccess.WRITE)
 	if not temp_file:
@@ -200,11 +200,11 @@ func save_game() -> void:
 			direct_file.flush()
 			direct_file.close()
 		return
-	
+
 	temp_file.store_string(json_str)
 	temp_file.flush()
 	temp_file.close()
-	
+
 	# Verify temp file is non-empty before replacing main save
 	var verify_file = FileAccess.open(TEMP_SAVE_PATH, FileAccess.READ)
 	if verify_file:
@@ -231,14 +231,14 @@ func load_game() -> void:
 			path_to_load = TEMP_SAVE_PATH
 		else:
 			return
-	
+
 	var file = FileAccess.open(path_to_load, FileAccess.READ)
 	if not file:
 		return
-	
+
 	var content = file.get_as_text()
 	file.close()
-	
+
 	var parser = JSON.new()
 	var parse_err = parser.parse(content)
 	if parse_err != OK:
@@ -251,13 +251,13 @@ func load_game() -> void:
 				if parser.parse(b_content) == OK:
 					_apply_loaded_data(parser.get_data())
 		return
-	
+
 	_apply_loaded_data(parser.get_data())
 
 func _apply_loaded_data(data: Variant) -> void:
 	if typeof(data) != TYPE_DICTIONARY:
 		return
-	
+
 	coins = maxi(0, int(data.get("coins", 0)))
 	highest_unlocked_level = clampi(int(data.get("highest_unlocked_level", 1)), 1, 3)
 	sound_enabled = bool(data.get("sound_enabled", true))
@@ -265,7 +265,7 @@ func _apply_loaded_data(data: Variant) -> void:
 	upgrade_damage = clampi(int(data.get("upgrade_damage", 0)), 0, 50)
 	upgrade_fire_rate = clampi(int(data.get("upgrade_fire_rate", 0)), 0, 50)
 	current_weapon_index = clampi(int(data.get("current_weapon_index", 0)), 0, WEAPON_DATA.size() - 1)
-	
+
 	var unl_w = data.get("unlocked_weapons", [0])
 	unlocked_weapons.clear()
 	if typeof(unl_w) == TYPE_ARRAY:
@@ -273,8 +273,8 @@ func _apply_loaded_data(data: Variant) -> void:
 			var wid = int(w)
 			if wid >= 0 and wid < WEAPON_DATA.size() and wid not in unlocked_weapons:
 				unlocked_weapons.append(wid)
-	
+
 	if 0 not in unlocked_weapons:
 		unlocked_weapons.append(0)
-	
+
 	_sanitize_state()
