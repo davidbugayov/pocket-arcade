@@ -1,0 +1,15 @@
+{
+  "title": "Real War: Not Fake",
+  "package_name": "com.devdop.realwar",
+  "version_name": "4.6.27",
+  "version_code": "10037",
+  "architecture": "arm64-v8a",
+  "min_sdk": 25,
+  "downloaded_on": "2026-11-14",
+  "official_listing": "https://play.google.com/store/apps/details?id=com.devdop.realwar",
+  "download_page": "https://apkpure.net/real-war-not-fake/com.devdop.realwar/download",
+  "download_url": "https://d-ru.apkpure.net/b/XAPK/com.devdop.realwar?versionCode=10037&nc=arm64-v8a&sv=25",
+  "published_archive_sha1": "f4f08043ea21e0de3772f68e7a4a80cb4f1bfb61",
+  "published_signer_sha1": "e0fd58a57a06db4e0d6c7f41d076871375cda23b",
+  "verification": "Archive SHA1 matches the arm64 variant listed by APKPure. ZIP CRC checked for archive and both APKs; see signature-verification.txt for signing verification. No installation or execution performed."
+}

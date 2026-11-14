@@ -1,0 +1,206 @@
+[gd_scene load_steps=2 format=3 uid="uid://b8squadmainmenu"]
+
+[ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_mainmenu"]
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_mainmenu")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.09, 0.16, 1)
+
+[node name="TopPanel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 100.0
+grow_horizontal = 2
+
+[node name="SoundBtn" type="Button" parent="TopPanel"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 30.0
+offset_top = -30.0
+offset_right = 200.0
+offset_bottom = 30.0
+grow_vertical = 2
+theme_override_font_sizes/font_size = 22
+text = "SOUND: ON"
+
+[node name="CoinBox" type="HBoxContainer" parent="TopPanel"]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -240.0
+offset_top = -25.0
+offset_right = -30.0
+offset_bottom = 25.0
+grow_horizontal = 0
+grow_vertical = 2
+alignment = 2
+
+[node name="Icon" type="Label" parent="TopPanel/CoinBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_font_sizes/font_size = 32
+text = "🪙"
+
+[node name="CoinsLabel" type="Label" parent="TopPanel/CoinBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.3, 1)
+theme_override_font_sizes/font_size = 32
+text = "0"
+
+[node name="TitleBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 130.0
+offset_bottom = 300.0
+grow_horizontal = 2
+alignment = 1
+
+[node name="Title" type="Label" parent="TitleBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.8, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
+theme_override_constants/shadow_offset_y = 6
+theme_override_font_sizes/font_size = 72
+text = "SQUAD RUSH"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="TitleBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.7, 0.2, 1)
+theme_override_font_sizes/font_size = 28
+text = "POCKET ARCADE"
+horizontal_alignment = 1
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = 340.0
+offset_right = -40.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 30
+
+[node name="LevelHeader" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "SELECT MISSION"
+
+[node name="LevelSelect" type="VBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Lvl1Btn" type="Button" parent="VBox/LevelSelect"]
+custom_minimum_size = Vector2(0, 85)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "LEVEL 1: BRIDGE ASSAULT"
+
+[node name="Lvl2Btn" type="Button" parent="VBox/LevelSelect"]
+custom_minimum_size = Vector2(0, 85)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "LEVEL 2: THE DIVIDE"
+
+[node name="Lvl3Btn" type="Button" parent="VBox/LevelSelect"]
+custom_minimum_size = Vector2(0, 85)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "LEVEL 3: FINAL TITAN"
+
+[node name="UpgHeader" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "SQUAD UPGRADES"
+
+[node name="UpgradesBox" type="VBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="SquadRow" type="HBoxContainer" parent="VBox/UpgradesBox"]
+layout_mode = 2
+
+[node name="StatLbl" type="Label" parent="VBox/UpgradesBox/SquadRow"]
+layout_mode = 3
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "Squad Size: 1"
+
+[node name="UpgBtn" type="Button" parent="VBox/UpgradesBox/SquadRow"]
+custom_minimum_size = Vector2(220, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "40 COINS"
+
+[node name="DmgRow" type="HBoxContainer" parent="VBox/UpgradesBox"]
+layout_mode = 2
+
+[node name="StatLbl" type="Label" parent="VBox/UpgradesBox/DmgRow"]
+layout_mode = 3
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "Damage: +0%"
+
+[node name="UpgBtn" type="Button" parent="VBox/UpgradesBox/DmgRow"]
+custom_minimum_size = Vector2(220, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "50 COINS"
+
+[node name="FireRow" type="HBoxContainer" parent="VBox/UpgradesBox"]
+layout_mode = 2
+
+[node name="StatLbl" type="Label" parent="VBox/UpgradesBox/FireRow"]
+layout_mode = 3
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "Fire Rate: +0%"
+
+[node name="UpgBtn" type="Button" parent="VBox/UpgradesBox/FireRow"]
+custom_minimum_size = Vector2(220, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "45 COINS"
+
+[node name="ArmoryHeader" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 26
+text = "WEAPON ARMORY"
+
+[node name="WeaponArmory" type="ScrollContainer" parent="VBox"]
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+horizontal_scroll_mode = 1
+vertical_scroll_mode = 0
+
+[node name="WeaponRow" type="HBoxContainer" parent="VBox/WeaponArmory"]
+layout_mode = 2
+theme_override_constants/separation = 16
+

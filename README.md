@@ -17,10 +17,10 @@ on your phone and across your devices, with passkey sign-in and data stored on y
 ![React](https://img.shields.io/badge/React-19-38bdf8?style=flat-square&logo=react&logoColor=white)
 ![No tracking](https://img.shields.io/badge/telemetry-none-f472b6?style=flat-square)
 <br>
-![GitHub last commit](https://img.shields.io/github/last-commit/davidbugayov/gym?style=flat-square)
-[![Production deploy](https://github.com/davidbugayov/gym/actions/workflows/deploy-gym-online.yml/badge.svg?branch=main)](https://github.com/davidbugayov/gym/actions/workflows/deploy-gym-online.yml)
-[![GitHub stars](https://img.shields.io/github/stars/davidbugayov/gym?style=flat-square)](https://github.com/davidbugayov/gym/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/davidbugayov/gym?style=flat-square)](https://github.com/davidbugayov/gym/issues)
+![GitHub last commit](https://img.shields.io/github/last-commit/davidbugayov/pocket-arcade?style=flat-square)
+[![Production deploy](https://github.com/davidbugayov/pocket-arcade/actions/workflows/deploy-gym-online.yml/badge.svg?branch=main)](https://github.com/davidbugayov/pocket-arcade/actions/workflows/deploy-gym-online.yml)
+[![GitHub stars](https://img.shields.io/github/stars/davidbugayov/pocket-arcade?style=flat-square)](https://github.com/davidbugayov/pocket-arcade/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/davidbugayov/pocket-arcade?style=flat-square)](https://github.com/davidbugayov/pocket-arcade/issues)
 
 </div>
 
@@ -80,8 +80,8 @@ offline use, and sync between your devices.
 You need Node.js 22 or newer.
 
 ```bash
-git clone https://github.com/davidbugayov/gym.git
-cd gym
+git clone https://github.com/davidbugayov/pocket-arcade.git
+cd pocket-arcade
 npm install
 PORT=3000 RP_ID=localhost ORIGIN=http://localhost:3000 npm run dev
 ```
@@ -147,7 +147,7 @@ Training logic is kept in reusable modules under `frontend/src/lib/`. Run fronte
 ## Contributing
 
 Issues and PRs for this repository are welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** or
-[open a GitHub issue](https://github.com/davidbugayov/gym/issues).
+[open a GitHub issue](https://github.com/davidbugayov/pocket-arcade/issues).
 
 ## License
 
@@ -156,5 +156,5 @@ separate terms; see [NOTICE.md](NOTICE.md).
 
 ## Production
 
-[gym.emdrbilateral.online](https://gym.emdrbilateral.online) deploys on pushes to `main` ([workflow status](https://github.com/davidbugayov/gym/actions/workflows/deploy-gym-online.yml)).
+[gym.emdrbilateral.online](https://gym.emdrbilateral.online) deploys on pushes to `main` ([workflow status](https://github.com/davidbugayov/pocket-arcade/actions/workflows/deploy-gym-online.yml)).
 The `.ru` hostname redirects to `.online`.
