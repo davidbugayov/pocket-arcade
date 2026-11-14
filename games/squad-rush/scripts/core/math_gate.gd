@@ -16,6 +16,7 @@ enum OperationType {
 
 var applied: bool = false
 var area: Area3D
+var shootable_hitbox: Area3D
 var label: Label3D
 var text_bg: MeshInstance3D
 var barrier_mesh: MeshInstance3D
@@ -24,6 +25,14 @@ var frame_left: MeshInstance3D
 var frame_right: MeshInstance3D
 
 var tracked_squad: PlayerSquad = null
+var punch_tween: Tween
+var multiplier_bullet_hits: int = 0
+var last_bullet_hit_time: float = -1.0
+
+const MAX_LABEL_DIST: float = 52.0
+const MIN_HIT_INTERVAL: float = 0.16 # Rate-limited token bucket (Real War mechanic)
+const MAX_GATE_VALUE_ADD: int = 50
+const MAX_GATE_VALUE_MULT: int = 5
 
 func _ready() -> void:
 	_build_visuals()
@@ -89,6 +98,9 @@ func _build_visuals() -> void:
 	mat_tbg.albedo_color = Color(0.04, 0.04, 0.06, 0.85)
 	mat_tbg.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	text_bg.material_override = mat_tbg
+	text_bg.visibility_range_end = MAX_LABEL_DIST
+	text_bg.visibility_range_end_margin = 8.0
+	text_bg.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	add_child(text_bg)
 
 	# Large Bold Label
@@ -99,6 +111,9 @@ func _build_visuals() -> void:
 	label.outline_modulate = Color(0, 0, 0, 1)
 	label.position = Vector3(0, gate_height * 0.52, 0.08)
 	label.double_sided = true
+	label.visibility_range_end = MAX_LABEL_DIST
+	label.visibility_range_end_margin = 8.0
+	label.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	add_child(label)
 
 	_update_display()
@@ -153,6 +168,80 @@ func _setup_trigger() -> void:
 
 	area.body_entered.connect(_on_body_entered)
 
+	# Shootable hitbox for player bullets (increases gate value on hit, Real War mechanic)
+	shootable_hitbox = Area3D.new()
+	shootable_hitbox.name = "GateShootableHitbox"
+	shootable_hitbox.collision_layer = 2 # Matches player bullet mask (layer 2)
+	shootable_hitbox.collision_mask = 0
+	shootable_hitbox.monitoring = false
+	shootable_hitbox.monitorable = true
+
+	var s_col = CollisionShape3D.new()
+	var s_box = BoxShape3D.new()
+	s_box.size = Vector3(3.9, 3.2, 0.4)
+	s_col.shape = s_box
+	s_col.position.y = 1.6
+	shootable_hitbox.add_child(s_col)
+	add_child(shootable_hitbox)
+
+func take_damage(amount: float) -> void:
+	on_bullet_hit(amount)
+
+func on_bullet_hit(_damage: float = 1.0, ignore_rate_limit: bool = false) -> void:
+	if applied:
+		return
+
+	# Rate limit gate hits (Real War token bucket prevents large squads from overflowing gate)
+	if not ignore_rate_limit:
+		var cur_time = Time.get_ticks_msec() * 0.001
+		if cur_time - last_bullet_hit_time < MIN_HIT_INTERVAL:
+			return
+		last_bullet_hit_time = cur_time
+
+	# Real War mechanic: shooting a gate upgrades its bonus
+	match operation:
+		OperationType.ADD:
+			if value < MAX_GATE_VALUE_ADD:
+				value += 1
+		OperationType.SUBTRACT:
+			value -= 1
+			if value <= 0:
+				operation = OperationType.ADD
+				value = 1 # Turns from penalty into bonus!
+		OperationType.MULTIPLY:
+			multiplier_bullet_hits += 1
+			if multiplier_bullet_hits >= 5:
+				multiplier_bullet_hits = 0
+				if value < MAX_GATE_VALUE_MULT:
+					value += 1
+		OperationType.DIVIDE:
+			multiplier_bullet_hits += 1
+			if multiplier_bullet_hits >= 4:
+				multiplier_bullet_hits = 0
+				value -= 1
+				if value <= 1:
+					operation = OperationType.MULTIPLY
+					value = 2
+
+	_update_display()
+	_punch_text()
+
+func _punch_text() -> void:
+	if not is_instance_valid(label):
+		return
+	if punch_tween and punch_tween.is_valid():
+		punch_tween.kill()
+
+	label.scale = Vector3(1.24, 1.24, 1.24)
+	punch_tween = create_tween()
+	punch_tween.tween_property(label, "scale", Vector3.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+	if is_instance_valid(barrier_mesh) and barrier_mesh.material_override:
+		var b_mat: StandardMaterial3D = barrier_mesh.material_override
+		var prev_albedo = b_mat.albedo_color
+		b_mat.albedo_color = Color(prev_albedo.r + 0.3, prev_albedo.g + 0.3, prev_albedo.b + 0.3, 0.7)
+		punch_tween.parallel().tween_property(b_mat, "albedo_color", prev_albedo, 0.15)
+
 func _physics_process(_delta: float) -> void:
 	if applied:
 		return
@@ -162,6 +251,15 @@ func _physics_process(_delta: float) -> void:
 		var p_nodes = get_tree().get_nodes_in_group("player")
 		if p_nodes.size() > 0:
 			tracked_squad = p_nodes[0] as PlayerSquad
+
+	# Distance culling for gate text & badge: eliminates distant horizon overlap
+	if is_instance_valid(tracked_squad):
+		var dist = abs(global_position.z - tracked_squad.global_position.z)
+		var in_range = (dist <= MAX_LABEL_DIST)
+		if is_instance_valid(label) and label.visible != in_range:
+			label.visible = in_range
+		if is_instance_valid(text_bg) and text_bg.visible != in_range:
+			text_bg.visible = in_range
 
 	# Secondary proximity check to ensure crossing is never missed at high speeds
 	if is_instance_valid(tracked_squad) and not applied:
@@ -196,6 +294,8 @@ func apply_to_squad(squad: PlayerSquad) -> void:
 	applied = true
 	if is_instance_valid(area):
 		area.set_deferred("monitoring", false)
+	if is_instance_valid(shootable_hitbox):
+		shootable_hitbox.set_deferred("monitorable", false)
 
 	# Deactivate and fade partner gate
 	if is_instance_valid(partner_gate) and not partner_gate.applied:
@@ -225,6 +325,8 @@ func _get_level_parent() -> LevelBase:
 func _fade_and_remove() -> void:
 	if is_instance_valid(area):
 		area.set_deferred("monitoring", false)
+	if is_instance_valid(shootable_hitbox):
+		shootable_hitbox.set_deferred("monitorable", false)
 	var tween = create_tween()
 	tween.tween_property(self, "scale", Vector3(1.15, 0.05, 1.15), 0.2).set_trans(Tween.TRANS_SINE)
 	tween.parallel().tween_property(self, "position:y", position.y - 0.8, 0.2)

@@ -27,6 +27,7 @@ var boss_stop_z: float = -9999.0
 var is_defeated: bool = false
 
 const SPACING = 0.62
+const MAX_SQUAD_SIZE = 60
 
 var badge_root: Node3D
 var count_label: Label3D
@@ -42,7 +43,7 @@ func _ready() -> void:
 
 	squad_col_shape = CollisionShape3D.new()
 	squad_cylinder = CylinderShape3D.new()
-	squad_cylinder.radius = 0.9
+	squad_cylinder.radius = 0.45
 	squad_cylinder.height = 1.6
 	squad_col_shape.shape = squad_cylinder
 	squad_col_shape.position.y = 0.8
@@ -56,18 +57,18 @@ func _ready() -> void:
 
 func _create_count_badge() -> void:
 	badge_root = Node3D.new()
-	badge_root.position = Vector3(0, 2.4, 0)
+	badge_root.position = Vector3(0, 1.45, 0.1)
 	add_child(badge_root)
 
-	# Background Pill Mesh
+	# Compact background pill badge (keeps view of road and targets clear)
 	badge_bg = MeshInstance3D.new()
 	var quad = QuadMesh.new()
-	quad.size = Vector2(1.5, 0.65)
+	quad.size = Vector2(0.62, 0.28)
 	badge_bg.mesh = quad
 
 	var mat = StandardMaterial3D.new()
 	mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(0.06, 0.32, 0.88, 0.92)
+	mat.albedo_color = Color(0.06, 0.32, 0.88, 0.90)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	badge_bg.material_override = mat
@@ -75,13 +76,12 @@ func _create_count_badge() -> void:
 
 	count_label = Label3D.new()
 	count_label.text = "1"
-	count_label.pixel_size = 0.009
-	count_label.font_size = 56
-	count_label.modulate = Color(1, 1, 1)
+	count_label.pixel_size = 0.006
+	count_label.font_size = 32
+	count_label.outline_size = 8
 	count_label.outline_modulate = Color(0, 0, 0)
-	count_label.outline_size = 14
 	count_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	count_label.position.z = 0.05
+	count_label.position.z = 0.03
 	badge_root.add_child(count_label)
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -127,20 +127,28 @@ func _physics_process(delta: float) -> void:
 			position.z = boss_stop_z
 			is_stopped_at_boss = true
 
-	# Update all members
+	# Update all members with shooter budget (Real War crowd shooter architecture)
 	var wdata = GameManager.get_weapon_data()
 	var dmg_m = GameManager.get_damage_multiplier()
 	var fire_m = GameManager.get_fire_rate_multiplier()
+	var total_members = members.size()
 
-	for m in members:
+	# Cap active bullet physics emitters to 10 (front rows) to preserve smooth 60 FPS on mobile
+	var max_active_shooters = mini(10, total_members)
+	var dmg_scale = float(total_members) / float(max_active_shooters) if max_active_shooters > 0 else 1.0
+
+	for i in range(total_members):
+		var m = members[i]
 		if is_instance_valid(m):
-			m.update_member(delta, can_shoot and not is_defeated, wdata, dmg_m, fire_m)
+			var is_shooter = (i < max_active_shooters)
+			var articulate = (i < 10)
+			m.update_member(delta, can_shoot and not is_defeated and is_shooter, wdata, dmg_m * dmg_scale, fire_m, articulate)
 
 func set_squad_size(new_count: int) -> void:
 	if is_defeated:
 		return
 
-	new_count = maxi(0, new_count)
+	new_count = clampi(new_count, 0, MAX_SQUAD_SIZE)
 	squad_count = new_count
 
 	if squad_count <= 0:
@@ -155,8 +163,12 @@ func set_squad_size(new_count: int) -> void:
 
 func _update_collision_size() -> void:
 	if is_instance_valid(squad_cylinder):
-		# Dynamically scale collision radius with squad size
-		squad_cylinder.radius = clampf(0.85 + sqrt(float(squad_count)) * 0.28, 0.85, 3.2)
+		# Dynamically scale collision radius with squad size:
+		# 1 soldier: ~0.45m
+		# 10 soldiers: ~1.15m
+		# 30 soldiers: ~1.75m
+		# 60 soldiers: ~2.35m
+		squad_cylinder.radius = clampf(0.35 + sqrt(float(squad_count)) * 0.26, 0.45, 2.8)
 
 func take_damage(amount: float) -> void:
 	if is_defeated or squad_count <= 0:
@@ -207,11 +219,11 @@ func _pulse_badge(flash_color: Color) -> void:
 	if is_instance_valid(badge_bg) and badge_bg.material_override:
 		(badge_bg.material_override as StandardMaterial3D).albedo_color = Color(flash_color.r * 0.8, flash_color.g * 0.8, flash_color.b * 0.8, 0.95)
 
-	badge_root.scale = Vector3(1.35, 1.35, 1.35)
-	tween.tween_property(badge_root, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_BACK)
-	tween.parallel().tween_property(count_label, "modulate", Color(1, 1, 1), 0.25)
+	badge_root.scale = Vector3(1.18, 1.18, 1.18)
+	tween.tween_property(badge_root, "scale", Vector3.ONE, 0.22).set_trans(Tween.TRANS_BACK)
+	tween.parallel().tween_property(count_label, "modulate", Color(1, 1, 1), 0.22)
 	if is_instance_valid(badge_bg) and badge_bg.material_override:
-		tween.parallel().tween_property(badge_bg.material_override, "albedo_color", Color(0.06, 0.32, 0.88, 0.92), 0.25)
+		tween.parallel().tween_property(badge_bg.material_override, "albedo_color", Color(0.06, 0.32, 0.88, 0.90), 0.22)
 
 func _flash_members_red() -> void:
 	for m in members:
@@ -260,8 +272,18 @@ func _calculate_formation_offsets(count: int) -> Array[Vector3]:
 
 	return offsets
 
+var last_squad_shot_sound_time: float = -1.0
+
 func _on_member_shot_fired(pos: Vector3, dir: Vector3, dmg: float, spd: float, col: Color) -> void:
 	if not is_defeated and can_shoot:
+		var cur_t = Time.get_ticks_msec() * 0.001
+		if cur_t - last_squad_shot_sound_time >= 0.12:
+			last_squad_shot_sound_time = cur_t
+			var wid = GameManager.get_weapon_data().get("id", 0)
+			match wid:
+				0: SoundManager.play("shoot_rifle", 0.08)
+				1: SoundManager.play("shoot_shotgun", 0.06)
+				2: SoundManager.play("shoot_minigun", 0.1)
 		bullet_spawn_requested.emit(pos, dir, dmg, spd, col)
 
 func stop_at_boss(boss_z: float) -> void:

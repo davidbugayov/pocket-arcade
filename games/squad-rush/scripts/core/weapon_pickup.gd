@@ -15,9 +15,9 @@ var anim_time: float = 0.0
 signal weapon_collected(w_id: int, w_name: String)
 
 static var weapon_scenes = {
-	0: preload("res://assets/models/rifle.glb"),
-	1: preload("res://assets/models/scattergun.glb"),
-	2: preload("res://assets/models/rotary_cannon.glb")
+	0: load("res://assets/models/rifle.glb"),
+	1: load("res://assets/models/scattergun.glb"),
+	2: load("res://assets/models/rotary_cannon.glb")
 }
 
 func _ready() -> void:
@@ -100,6 +100,9 @@ func _build_visuals() -> void:
 	mat_bg.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat_bg.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	bg_badge.material_override = mat_bg
+	bg_badge.visibility_range_end = 40.0
+	bg_badge.visibility_range_end_margin = 8.0
+	bg_badge.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	add_child(bg_badge)
 
 	# Text Label
@@ -112,6 +115,9 @@ func _build_visuals() -> void:
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.position = Vector3(0, 2.05, 0.02)
 	label.text = pickup_name
+	label.visibility_range_end = 40.0
+	label.visibility_range_end_margin = 8.0
+	label.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	add_child(label)
 
 func _update_weapon_model() -> void:
@@ -130,6 +136,16 @@ func _physics_process(delta: float) -> void:
 	if is_collected:
 		return
 
+	# Distance culling for weapon name badge: avoids horizon clutter
+	var p_nodes = get_tree().get_nodes_in_group("player")
+	if p_nodes.size() > 0 and is_instance_valid(p_nodes[0]):
+		var dist = abs(global_position.z - p_nodes[0].global_position.z)
+		var show_badge = (dist <= 40.0)
+		if is_instance_valid(label) and label.visible != show_badge:
+			label.visible = show_badge
+		if is_instance_valid(bg_badge) and bg_badge.visible != show_badge:
+			bg_badge.visible = show_badge
+
 	anim_time += delta * 2.8
 	if weapon_display_node:
 		weapon_display_node.position.y = 1.0 + sin(anim_time) * 0.12
@@ -142,9 +158,7 @@ func _on_body_entered(body: Node3D) -> void:
 	if body is PlayerSquad:
 		is_collected = true
 		SoundManager.play("weapon_upgrade")
-		GameManager.current_weapon_id = weapon_id_to_grant
-		if not weapon_id_to_grant in GameManager.unlocked_weapons:
-			GameManager.unlocked_weapons.append(weapon_id_to_grant)
+		GameManager.select_weapon(weapon_id_to_grant)
 
 		weapon_collected.emit(weapon_id_to_grant, pickup_name)
 

@@ -28,10 +28,12 @@ func _load_level(level_num: int) -> void:
 		_:
 			current_level_node = Level1.new()
 
+	if is_instance_valid(hud_node):
+		current_level_node.hud = hud_node
+
 	add_child(current_level_node)
 
 	if is_instance_valid(hud_node):
-		current_level_node.hud = hud_node
 		hud_node.setup_level(current_level_node)
 
 func _on_restart_level() -> void:

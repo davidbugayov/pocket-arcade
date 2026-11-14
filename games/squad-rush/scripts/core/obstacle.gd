@@ -23,14 +23,17 @@ var detector_shape: CollisionShape3D
 
 var has_collided_with_squad: bool = false
 var is_destroyed: bool = false
+var tracked_squad: Node3D = null
+
+const MAX_HP_DIST: float = 34.0
 
 signal destroyed(pos: Vector3, reward: int)
 
 static var model_scenes = {
-	ObstacleType.TIRE_STACK: preload("res://assets/models/tyre_stack.glb"),
-	ObstacleType.CRATE: preload("res://assets/models/ammunition_crate.glb"),
-	ObstacleType.BARREL: preload("res://assets/models/barrel.glb"),
-	ObstacleType.CONCRETE_BLOCK: preload("res://assets/models/jersey_barrier.glb")
+	ObstacleType.TIRE_STACK: load("res://assets/models/tyre_stack.glb"),
+	ObstacleType.CRATE: load("res://assets/models/ammunition_crate.glb"),
+	ObstacleType.BARREL: load("res://assets/models/barrel.glb"),
+	ObstacleType.CONCRETE_BLOCK: load("res://assets/models/jersey_barrier.glb")
 }
 
 func _ready() -> void:
@@ -178,6 +181,9 @@ func _create_hp_label() -> void:
 	mat_bg.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat_bg.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	hp_bg.material_override = mat_bg
+	hp_bg.visibility_range_end = MAX_HP_DIST
+	hp_bg.visibility_range_end_margin = 6.0
+	hp_bg.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	add_child(hp_bg)
 
 	hp_label = Label3D.new()
@@ -188,8 +194,26 @@ func _create_hp_label() -> void:
 	hp_label.modulate = Color(1.0, 0.92, 0.15) # Bold yellow
 	hp_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	hp_label.position = Vector3(0, 1.75, 0.02)
+	hp_label.visibility_range_end = MAX_HP_DIST
+	hp_label.visibility_range_end_margin = 6.0
+	hp_label.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	add_child(hp_label)
 	_update_hp_display()
+
+func _physics_process(_delta: float) -> void:
+	if is_destroyed:
+		return
+	if not is_instance_valid(tracked_squad):
+		var p_nodes = get_tree().get_nodes_in_group("player")
+		if p_nodes.size() > 0:
+			tracked_squad = p_nodes[0]
+	if is_instance_valid(tracked_squad):
+		var dist = abs(global_position.z - tracked_squad.global_position.z)
+		var show_hp = (dist <= MAX_HP_DIST)
+		if is_instance_valid(hp_label) and hp_label.visible != show_hp:
+			hp_label.visible = show_hp
+		if is_instance_valid(hp_bg) and hp_bg.visible != show_hp:
+			hp_bg.visible = show_hp
 
 func _update_hp_display() -> void:
 	if is_instance_valid(hp_label):

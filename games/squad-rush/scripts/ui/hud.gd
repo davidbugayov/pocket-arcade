@@ -33,6 +33,9 @@ var level_controller: LevelBase
 
 var damage_flash_rect: ColorRect
 var toast_label: Label
+@onready var tutorial_panel: PanelContainer = $TutorialBox/TutorialPill
+@onready var tutorial_label: Label = $TutorialBox/TutorialPill/TutorialLabel
+var tutorial_tween: Tween
 
 var start_z: float = 0.0
 var end_z: float = -200.0
@@ -42,9 +45,11 @@ func _ready() -> void:
 	boss_container.visible = false
 	pause_overlay.visible = false
 	game_over_overlay.visible = false
+	pause_button.text = "" # Ensured clear of fallback unicode square
 
 	_create_damage_flash_overlay()
 	_create_toast_ui()
+	_setup_tutorial_ui()
 
 	pause_button.pressed.connect(_on_pause_pressed)
 	$PauseOverlay/VBox/ResumeBtn.pressed.connect(_on_resume_pressed)
@@ -80,6 +85,39 @@ func _create_toast_ui() -> void:
 	toast_label.add_theme_constant_override("shadow_offset_y", 3)
 	toast_label.visible = false
 	add_child(toast_label)
+
+func _setup_tutorial_ui() -> void:
+	if not is_instance_valid(tutorial_panel):
+		return
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.08, 0.15, 0.90)
+	style.border_color = Color(0.2, 0.75, 1.0, 0.7)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(16)
+	style.content_margin_left = 24.0
+	style.content_margin_right = 24.0
+	style.content_margin_top = 8.0
+	style.content_margin_bottom = 8.0
+	tutorial_panel.add_theme_stylebox_override("panel", style)
+	tutorial_panel.visible = false
+
+func show_tutorial_hint(hint_text: String, duration: float = 3.2) -> void:
+	if not is_instance_valid(tutorial_panel) or not is_instance_valid(tutorial_label):
+		return
+
+	# Strictly one hint visible at a time: kill active tween and smoothly transition
+	if tutorial_tween and tutorial_tween.is_valid():
+		tutorial_tween.kill()
+
+	tutorial_label.text = hint_text
+	tutorial_panel.visible = true
+	tutorial_panel.modulate = Color(1, 1, 1, 0.0)
+
+	tutorial_tween = create_tween()
+	tutorial_tween.tween_property(tutorial_panel, "modulate:a", 1.0, 0.2).set_trans(Tween.TRANS_SINE)
+	tutorial_tween.tween_interval(duration)
+	tutorial_tween.tween_property(tutorial_panel, "modulate:a", 0.0, 0.3).set_trans(Tween.TRANS_SINE)
+	tutorial_tween.finished.connect(func(): if is_instance_valid(tutorial_panel): tutorial_panel.visible = false)
 
 func trigger_damage_flash() -> void:
 	if not is_instance_valid(damage_flash_rect):
@@ -162,7 +200,14 @@ func show_defeat() -> void:
 	next_btn.visible = false
 	game_over_overlay.visible = true
 
+func trigger_safe_pause() -> void:
+	if pause_overlay.visible or game_over_overlay.visible:
+		return
+	_on_pause_pressed()
+
 func _on_pause_pressed() -> void:
+	if pause_overlay.visible:
+		return
 	SoundManager.play("click")
 	pause_overlay.visible = true
 	get_tree().paused = true

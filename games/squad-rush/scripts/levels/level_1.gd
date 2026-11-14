@@ -17,21 +17,21 @@ func _setup_boss() -> void:
 	boss.boss_defeated.connect(_on_boss_defeated)
 
 func _build_level_layout() -> void:
-	# Tutorial Prompts
-	spawn_tutorial_text(-10.0, "SWIPE LEFT & RIGHT TO MOVE")
-	spawn_tutorial_text(-38.0, "SHOOT TO BREAK TARGETS")
-	spawn_tutorial_text(-80.0, "CROSS BLUE GATES TO MULTIPLY")
+	# Tutorial Prompts (compact, single hint at a time)
+	spawn_tutorial_text(-8.0, "SWIPE TO STEER SQUAD")
+	spawn_tutorial_text(-36.0, "SHOOT TO BREAK TARGETS")
+	spawn_tutorial_text(-80.0, "PASS BLUE GATES TO MULTIPLY")
 
 	# Section 1: Intro Tire Stacks (Center lane is open, 12 HP easily shot down)
-	spawn_obstacle(Vector3(-1.8, 0, -25.0), Obstacle.ObstacleType.TIRE_STACK, 12.0, 5)
-	spawn_obstacle(Vector3(1.8, 0, -25.0), Obstacle.ObstacleType.TIRE_STACK, 12.0, 5)
+	spawn_obstacle(Vector3(-2.1, 0, -25.0), Obstacle.ObstacleType.TIRE_STACK, 12.0, 5)
+	spawn_obstacle(Vector3(2.1, 0, -25.0), Obstacle.ObstacleType.TIRE_STACK, 12.0, 5)
 
 	# Gate 1: +5 vs +2 (Player chooses +5, squad becomes 6)
 	spawn_gate_pair(-55.0, MathGate.OperationType.ADD, 5, MathGate.OperationType.ADD, 2)
 
 	# Section 2: Wooden Crates (HP 18.0)
-	spawn_obstacle(Vector3(-1.8, 0, -75.0), Obstacle.ObstacleType.CRATE, 18.0, 8)
-	spawn_obstacle(Vector3(1.8, 0, -75.0), Obstacle.ObstacleType.CRATE, 18.0, 8)
+	spawn_obstacle(Vector3(-2.1, 0, -75.0), Obstacle.ObstacleType.CRATE, 18.0, 8)
+	spawn_obstacle(Vector3(2.1, 0, -75.0), Obstacle.ObstacleType.CRATE, 18.0, 8)
 
 	# Gate 2: x2 vs +10 (Squad becomes 12 or 16)
 	spawn_gate_pair(-102.0, MathGate.OperationType.MULTIPLY, 2, MathGate.OperationType.ADD, 10)

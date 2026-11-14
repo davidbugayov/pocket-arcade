@@ -21,6 +21,8 @@ var is_game_active: bool = false
 var is_boss_phase: bool = false
 var is_level_completed: bool = false
 
+var tutorial_triggers: Array[Dictionary] = []
+
 var camera_shake_trauma: float = 0.0
 
 signal level_won()
@@ -132,6 +134,16 @@ func _process(delta: float) -> void:
 
 		camera.position = camera.position.lerp(target_pos, delta * 12.0)
 
+		# Compact tutorial triggers: activate sequentially one at a time as player advances
+		if is_game_active:
+			var cur_z = player_squad.position.z
+			for trig in tutorial_triggers:
+				if not trig.get("triggered", false) and cur_z <= trig.get("z", 0.0):
+					trig["triggered"] = true
+					if is_instance_valid(hud) and hud.has_method("show_tutorial_hint"):
+						hud.show_tutorial_hint(trig.get("text", ""), trig.get("duration", 3.2))
+					break # Never overlap multiple hints
+
 		if is_instance_valid(boss) and not is_boss_phase and is_game_active:
 			if player_squad.position.z <= boss_z_position + 42.0:
 				_start_boss_battle()
@@ -220,16 +232,17 @@ func _on_weapon_collected(_w_id: int, w_name: String) -> void:
 	if is_instance_valid(hud) and hud.has_method("show_toast"):
 		hud.show_toast("ACQUIRED: " + w_name + "!")
 
+func add_tutorial_trigger(z_pos: float, text_content: String, duration: float = 3.2) -> void:
+	tutorial_triggers.append({
+		"z": z_pos,
+		"text": text_content,
+		"duration": duration,
+		"triggered": false
+	})
+
 func spawn_tutorial_text(z_pos: float, text_content: String) -> void:
-	var lbl = Label3D.new()
-	lbl.text = text_content
-	lbl.font_size = 56
-	lbl.outline_size = 16
-	lbl.outline_modulate = Color(0, 0, 0, 1)
-	lbl.modulate = Color(1.0, 0.95, 0.3)
-	lbl.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
-	lbl.position = Vector3(0, 2.6, z_pos)
-	add_child(lbl)
+	# Compatible with level definitions: routes to compact single-hint HUD system
+	add_tutorial_trigger(z_pos, text_content, 3.2)
 
 func _stop_all_combat() -> void:
 	is_game_active = false

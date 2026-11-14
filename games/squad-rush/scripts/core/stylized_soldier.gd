@@ -41,9 +41,9 @@ static var mat_flash: StandardMaterial3D
 
 # Preloaded Polyfork weapon scenes
 static var weapon_scenes = {
-	0: preload("res://assets/models/rifle.glb"),
-	1: preload("res://assets/models/scattergun.glb"),
-	2: preload("res://assets/models/rotary_cannon.glb")
+	0: load("res://assets/models/rifle.glb"),
+	1: load("res://assets/models/scattergun.glb"),
+	2: load("res://assets/models/rotary_cannon.glb")
 }
 
 func _init() -> void:
@@ -357,22 +357,24 @@ func equip_weapon(weapon_id: int) -> void:
 				muzzle_point.position = Vector3(0, 0.06, 0.58)
 				rotary_cluster = weapon_instance.find_child("cluster", true, false) as Node3D
 
-func animate_motion(delta: float, speed_factor: float = 1.0) -> void:
+func animate_motion(delta: float, speed_factor: float = 1.0, full_articulation: bool = true) -> void:
 	walk_time += delta * 14.0 * speed_factor
-
-	# Leg stride rotation
-	var stride_angle = sin(walk_time) * 34.0
-	left_leg.rotation_degrees.x = stride_angle
-	right_leg.rotation_degrees.x = -stride_angle
 
 	# Runner bounce
 	torso_node.position.y = 0.42 + abs(sin(walk_time)) * 0.05
-	torso_node.rotation_degrees.z = sin(walk_time * 0.5) * 2.5
-	head_node.rotation_degrees.x = sin(walk_time) * 3.0
 
-	# Arm counter-sway
-	left_arm.rotation_degrees.x = -stride_angle * 0.35
-	right_arm.rotation_degrees.x = stride_angle * 0.25
+	if full_articulation:
+		# Leg stride rotation
+		var stride_angle = sin(walk_time) * 34.0
+		left_leg.rotation_degrees.x = stride_angle
+		right_leg.rotation_degrees.x = -stride_angle
+
+		torso_node.rotation_degrees.z = sin(walk_time * 0.5) * 2.5
+		head_node.rotation_degrees.x = sin(walk_time) * 3.0
+
+		# Arm counter-sway
+		left_arm.rotation_degrees.x = -stride_angle * 0.35
+		right_arm.rotation_degrees.x = stride_angle * 0.25
 
 	# Recover recoil
 	if recoil_offset > 0.0:

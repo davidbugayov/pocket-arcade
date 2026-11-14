@@ -5,6 +5,7 @@ class_name SquadMember
 var target_offset: Vector3 = Vector3.ZERO
 var fire_timer: float = 0.0
 var is_active: bool = true
+var current_equipped_weapon: int = -1
 
 var soldier_model: StylizedSoldier
 var body_mesh: MeshInstance3D
@@ -30,17 +31,19 @@ func _build_model() -> void:
 func set_target_offset(offset: Vector3) -> void:
 	target_offset = offset
 
-func update_member(delta: float, can_shoot: bool, weapon_data: Dictionary, dmg_mult: float, fire_mult: float) -> void:
+func update_member(delta: float, can_shoot: bool, weapon_data: Dictionary, dmg_mult: float, fire_mult: float, articulate: bool = true) -> void:
 	if not is_active:
 		return
 
 	position = position.lerp(target_offset, delta * 12.0)
 
-	# Update weapon model
+	# Update weapon model only when changed
 	var wid: int = weapon_data.get("id", 0)
 	if soldier_model:
-		soldier_model.equip_weapon(wid)
-		soldier_model.animate_motion(delta, 1.0)
+		if current_equipped_weapon != wid:
+			current_equipped_weapon = wid
+			soldier_model.equip_weapon(wid)
+		soldier_model.animate_motion(delta, 1.0, articulate)
 
 	if can_shoot:
 		fire_timer -= delta
@@ -58,11 +61,6 @@ func _fire(weapon_data: Dictionary, dmg_mult: float) -> void:
 	var spread_count: int = weapon_data.get("spread_count", 1)
 	var b_color: Color = weapon_data.get("color", Color(0.2, 0.8, 1.0))
 	var wid: int = weapon_data.get("id", 0)
-
-	match wid:
-		0: SoundManager.play("shoot_rifle", 0.08)
-		1: SoundManager.play("shoot_shotgun", 0.06)
-		2: SoundManager.play("shoot_minigun", 0.1)
 
 	if soldier_model:
 		soldier_model.trigger_recoil()

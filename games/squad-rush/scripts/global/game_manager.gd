@@ -71,6 +71,23 @@ const WEAPON_DATA = [
 func _ready() -> void:
 	load_game()
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		save_game()
+		# Safe pause during active gameplay so fighters aren't lost while app is in background
+		var tree = get_tree()
+		if tree and not tree.paused:
+			var root_scene = tree.current_scene
+			if root_scene:
+				var hud = root_scene.get_node_or_null("HUD")
+				if hud and hud.has_method("trigger_safe_pause"):
+					hud.trigger_safe_pause()
+				elif hud and hud.has_method("_on_pause_pressed"):
+					hud._on_pause_pressed()
+	elif what == NOTIFICATION_APPLICATION_RESUMED or what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		# Retain safe pause state upon return until user explicitly taps Resume
+		pass
+
 func get_starting_squad_size() -> int:
 	return 1 + upgrade_squad_size
 

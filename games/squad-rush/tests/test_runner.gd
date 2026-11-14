@@ -17,6 +17,9 @@ func _ready() -> void:
 	test_obstacle_visuals_and_types()
 	test_obstacle_collision_single_use()
 	test_math_gate_single_use()
+	test_math_gate_shooting_upgrade()
+	test_compact_tutorial_system()
+	test_safe_pause_and_icon()
 	test_combat_completion_guard()
 	test_save_system_integrity()
 	test_level1_starter_solvability()
@@ -311,3 +314,84 @@ func test_level1_starter_solvability() -> void:
 	print("  Calculated Boss TTK with starter squad: %.2f seconds (DPS: %.1f)" % [time_to_kill_boss, total_squad_dps])
 	assert_test(time_to_kill_boss < 1.0, "Boss is eliminated in < 1.0 second by starter squad")
 	assert_test(squad_size >= 25, "Squad has overwhelming numbers (>25) at boss entrance")
+
+func test_math_gate_shooting_upgrade() -> void:
+	print("\n--- Test: Math Gate Shooting Upgrade (Real War Mechanic) ---")
+
+	# 1. ADD gate value increases on shot
+	var add_gate = MathGate.new()
+	add_gate.setup(MathGate.OperationType.ADD, 5, true)
+	add_child(add_gate)
+	assert_test(add_gate.value == 5, "Initial ADD gate value is 5")
+
+	add_gate.on_bullet_hit(10.0, true)
+	assert_test(add_gate.value == 6, "ADD gate upgraded from +5 to +6 on bullet hit")
+	add_gate.on_bullet_hit(10.0, true)
+	assert_test(add_gate.value == 7, "ADD gate upgraded from +6 to +7 on bullet hit")
+
+	# 2. SUBTRACT gate reduces penalty and converts to ADD when depleted
+	var sub_gate = MathGate.new()
+	sub_gate.setup(MathGate.OperationType.SUBTRACT, 2, false)
+	add_child(sub_gate)
+	assert_test(sub_gate.operation == MathGate.OperationType.SUBTRACT, "Initial gate is SUBTRACT")
+	assert_test(sub_gate.value == 2, "Initial penalty is -2")
+
+	sub_gate.on_bullet_hit(10.0, true)
+	assert_test(sub_gate.value == 1, "SUBTRACT penalty reduced from -2 to -1")
+
+	sub_gate.on_bullet_hit(10.0, true)
+	assert_test(sub_gate.operation == MathGate.OperationType.ADD, "Depleted negative gate converted to ADD gate")
+	assert_test(sub_gate.value == 1, "Converted gate has positive value +1")
+
+	# 3. Applied gate rejects further upgrades
+	add_gate.applied = true
+	add_gate.on_bullet_hit(10.0, true)
+	assert_test(add_gate.value == 7, "Applied gate does not accept further shooting upgrades")
+
+	add_gate.free()
+	sub_gate.free()
+
+func test_compact_tutorial_system() -> void:
+	print("\n--- Test: Compact Sequential Tutorial System ---")
+
+	var level = Level1.new()
+	add_child(level)
+
+	# Verify triggers are registered
+	assert_test(level.tutorial_triggers.size() >= 3, "Level 1 has at least 3 tutorial triggers registered")
+	assert_test(level.tutorial_triggers[0]["triggered"] == false, "Initial trigger is not yet fired")
+
+	# Simulate squad position advancing past trigger 1 (z = -8.0)
+	level.player_squad.position.z = -12.0
+	level._process(0.016)
+
+	assert_test(level.tutorial_triggers[0]["triggered"] == true, "Trigger 1 fired when squad passed z = -8.0")
+	assert_test(level.tutorial_triggers[1]["triggered"] == false, "Trigger 2 remains unfired until reaching its position")
+
+	level.free()
+
+func test_safe_pause_and_icon() -> void:
+	print("\n--- Test: Safe Pause & Icon Integrity ---")
+
+	var world_scene = load("res://scenes/game_world.tscn")
+	var world = world_scene.instantiate()
+	add_child(world)
+
+	var hud = world.get_node("HUD") as HUD
+	assert_test(hud != null, "HUD node found in GameWorld scene")
+	assert_test(hud.pause_button != null, "PauseButton found in HUD")
+	assert_test(hud.pause_button.text == "", "Pause button text is empty (icon uses crisp child bars, no unicode tofu)")
+	assert_test(hud.pause_button.has_node("Bars"), "Pause button contains child Bars node")
+	assert_test(hud.tutorial_panel != null, "Tutorial pill panel found in HUD")
+
+	# Safe pause test
+	hud.trigger_safe_pause()
+	assert_test(hud.pause_overlay.visible == true, "Safe pause displays pause overlay")
+	assert_test(get_tree().paused == true, "Engine tree paused on safe pause")
+
+	# Resume test
+	hud._on_resume_pressed()
+	assert_test(hud.pause_overlay.visible == false, "Resume closes pause overlay")
+	assert_test(get_tree().paused == false, "Engine tree resumed after resume pressed")
+
+	world.free()

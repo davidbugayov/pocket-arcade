@@ -47,14 +47,16 @@ var telegraph_charge_left: MeshInstance3D
 var telegraph_charge_right: MeshInstance3D
 
 static var boss_models = {
-	BossType.HEAVY_ROBOT: preload("res://assets/models/service_robot.glb"),
-	BossType.TANK: preload("res://assets/models/medium_tank.glb"),
-	BossType.DREAD_TITAN: preload("res://assets/models/cargo_walker.glb")
+	BossType.HEAVY_ROBOT: load("res://assets/models/service_robot.glb"),
+	BossType.TANK: load("res://assets/models/medium_tank.glb"),
+	BossType.DREAD_TITAN: load("res://assets/models/cargo_walker.glb")
 }
 
 func _ready() -> void:
 	collision_layer = 16
 	collision_mask = 1 | 4
+	monitoring = true
+	monitorable = true
 
 	current_hp = max_hp
 	_rebuild_boss_visuals()

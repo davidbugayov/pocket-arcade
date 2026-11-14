@@ -107,6 +107,9 @@ func _create_hp_label() -> void:
 	mat_bg.albedo_color = Color(0.1, 0.05, 0.05, 0.85)
 	mat_bg.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	hp_bg.material_override = mat_bg
+	hp_bg.visibility_range_end = 34.0
+	hp_bg.visibility_range_end_margin = 6.0
+	hp_bg.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	add_child(hp_bg)
 
 	hp_label = Label3D.new()
@@ -116,6 +119,9 @@ func _create_hp_label() -> void:
 	hp_label.outline_modulate = Color(0, 0, 0, 1)
 	hp_label.font_size = 38
 	hp_label.text = str(int(current_hp))
+	hp_label.visibility_range_end = 34.0
+	hp_label.visibility_range_end_margin = 6.0
+	hp_label.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	add_child(hp_label)
 
 	_update_hp_display()
@@ -127,6 +133,17 @@ func _update_hp_display() -> void:
 func _physics_process(delta: float) -> void:
 	if is_dead:
 		return
+
+	# Distance culling for enemy HP label: avoids cluttering distant horizon
+	var p_nodes = get_tree().get_nodes_in_group("player")
+	if p_nodes.size() > 0 and is_instance_valid(p_nodes[0]):
+		var pz = p_nodes[0].global_position.z
+		var dist = abs(global_position.z - pz)
+		var show_hp = (dist <= 34.0)
+		if is_instance_valid(hp_label) and hp_label.visible != show_hp:
+			hp_label.visible = show_hp
+		if is_instance_valid(hp_bg) and hp_bg.visible != show_hp:
+			hp_bg.visible = show_hp
 
 	if moves_forward and is_active:
 		position.z += move_speed * delta
