@@ -1,8 +1,10 @@
 <div align="center">
 
-# Gymly
+# Pocket Arcade
 
-**A self-hosted gym and body-weight tracker you control.**
+**Проект коротких игр, создаваемых с помощью Craft Anything.**
+
+Текущее содержимое репозитория — фитнес-приложение Gymly; разработка игр ещё не начата. Ниже сохранена его документация.
 
 Plan your week, run guided workouts, track every set and your body weight over time —
 on your phone and across your devices, with passkey sign-in and data stored on your server.
