@@ -36,6 +36,7 @@ var toast_label: Label
 
 var start_z: float = 0.0
 var end_z: float = -200.0
+var fps_log_timer: float = 0.0
 
 func _ready() -> void:
 	boss_container.visible = false
@@ -113,7 +114,7 @@ func setup_level(level: LevelBase) -> void:
 	level.level_won.connect(show_victory)
 	level.level_lost.connect(show_defeat)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not is_instance_valid(level_controller) or not is_instance_valid(level_controller.player_squad):
 		return
 	
@@ -124,6 +125,13 @@ func _process(_delta: float) -> void:
 	progress_bar.value = pct
 	
 	coins_label.text = str(GameManager.run_coins)
+	
+	fps_log_timer += delta
+	if fps_log_timer >= 1.0:
+		fps_log_timer = 0.0
+		var current_fps = Engine.get_frames_per_second()
+		var sq_size = level_controller.player_squad.squad_count
+		print("[PERF_METRICS] FPS: %d | Squad size: %d | Progress: %d%%" % [current_fps, sq_size, int(pct)])
 
 func show_boss_bar(b_name: String, max_hp: float) -> void:
 	boss_name_label.text = b_name.to_upper()

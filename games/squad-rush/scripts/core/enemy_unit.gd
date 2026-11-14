@@ -247,7 +247,7 @@ func _die() -> void:
 	set_deferred("monitorable", false)
 	
 	var tween = create_tween()
-	tween.tween_property(self, "scale", Vector3.ZERO, 0.15).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.15).set_trans(Tween.TRANS_BACK)
 	tween.finished.connect(func(): queue_free())
 
 func _on_body_entered(body: Node3D) -> void:

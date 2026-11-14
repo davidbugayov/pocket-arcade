@@ -136,5 +136,5 @@ func _collect(squad: PlayerSquad) -> void:
 	var tw = create_tween()
 	tw.tween_property(self, "scale", Vector3(1.4, 1.4, 1.4), 0.15)
 	tw.parallel().tween_property(self, "position:y", position.y + 1.2, 0.25)
-	tw.tween_property(self, "scale", Vector3.ZERO, 0.15)
+	tw.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.15)
 	tw.finished.connect(func(): queue_free())
