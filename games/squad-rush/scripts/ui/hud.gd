@@ -73,10 +73,10 @@ func _create_toast_ui() -> void:
 	toast_label.offset_bottom = 280.0
 	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	toast_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	toast_label.theme_override_font_sizes/font_size = 32
-	toast_label.theme_override_colors/font_color = Color(1.0, 0.9, 0.2)
-	toast_label.theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
-	toast_label.theme_override_constants/shadow_offset_y = 3
+	toast_label.add_theme_font_size_override("font_size", 32)
+	toast_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))
+	toast_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	toast_label.add_theme_constant_override("shadow_offset_y", 3)
 	toast_label.visible = false
 	add_child(toast_label)
 

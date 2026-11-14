@@ -37,6 +37,8 @@ func play(sound_name: String, pitch_rnd: float = 0.05) -> void:
 		return
 	if not streams.has(sound_name):
 		return
+	if players.is_empty():
+		return
 	
 	var p = players[player_index]
 	player_index = (player_index + 1) % POOL_SIZE

@@ -275,8 +275,8 @@ func _trigger_defeat() -> void:
 	can_shoot = false
 	if is_instance_valid(badge_root):
 		badge_root.visible = false
-	SoundManager.play("defeat")
 	squad_defeated.emit()
+	SoundManager.play("defeat")
 
 func stop_squad() -> void:
 	can_move = false

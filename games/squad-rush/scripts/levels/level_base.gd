@@ -201,8 +201,10 @@ func spawn_enemy(pos: Vector3, hp: float, coins: int, moves: bool = false) -> En
 	enemy.enemy_shot_fired.connect(_on_enemy_shot_fired)
 	return enemy
 
-func spawn_weapon_pickup(pos: Vector3, weapon_id: int, pickup_name: String = "") -> WeaponPickup:
-	var pickup = WeaponPickup.new()
+const WeaponPickupScript = preload("res://scripts/core/weapon_pickup.gd")
+
+func spawn_weapon_pickup(pos: Vector3, weapon_id: int, pickup_name: String = "") -> Node3D:
+	var pickup = WeaponPickupScript.new()
 	pickup.setup(weapon_id, pickup_name)
 	pickup.position = pos
 	add_child(pickup)

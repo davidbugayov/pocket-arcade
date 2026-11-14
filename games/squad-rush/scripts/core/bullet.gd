@@ -83,8 +83,8 @@ func _on_area_entered(area: Area3D) -> void:
 		return
 	
 	if is_player_bullet:
-		# Player bullet can only hit enemies/boss or obstacles
-		if area is EnemyUnit or area is BossUnit or area is Obstacle:
+		# Player bullet can only hit enemies/boss (EnemyUnit and BossUnit are Area3D)
+		if area is EnemyUnit or area is BossUnit:
 			has_hit = true
 			if area.has_method("take_damage"):
 				area.take_damage(damage)
@@ -94,7 +94,7 @@ func _on_area_entered(area: Area3D) -> void:
 		# Enemy bullet: NEVER hit other enemies or boss
 		if area is EnemyUnit or area is BossUnit:
 			return
-		# If it hits player squad or player area
+		# If it hits player area or has take_damage
 		if area.has_method("take_damage"):
 			has_hit = true
 			area.take_damage(damage)
