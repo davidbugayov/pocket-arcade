@@ -24,6 +24,8 @@ var attack_interval: float = 1.8
 var boss_mesh: Node3D
 var left_cannon: Node3D
 var right_cannon: Node3D
+var left_cannon_mesh: MeshInstance3D
+var right_cannon_mesh: MeshInstance3D
 
 func _ready() -> void:
 	collision_layer = 16
@@ -89,8 +91,10 @@ func _build_visuals() -> void:
 		boss_mesh.add_child(muzzle)
 		if side < 0:
 			left_cannon = muzzle
+			left_cannon_mesh = cannon
 		else:
 			right_cannon = muzzle
+			right_cannon_mesh = cannon
 	
 	var col = CollisionShape3D.new()
 	var box_shape = BoxShape3D.new()
@@ -102,6 +106,9 @@ func _build_visuals() -> void:
 func activate() -> void:
 	is_active = true
 	boss_hp_changed.emit(current_hp, max_hp)
+
+func stop_boss() -> void:
+	is_active = false
 
 func _physics_process(delta: float) -> void:
 	if not is_active or is_dead:
@@ -121,12 +128,23 @@ func _physics_process(delta: float) -> void:
 		_execute_attack()
 
 func _execute_attack() -> void:
+	if not is_active or is_dead:
+		return
+	
 	SoundManager.play("shoot_shotgun", 0.05)
 	var forward = global_transform.basis.z
 	
 	if left_cannon and right_cannon:
 		boss_shot_fired.emit(left_cannon.global_position, (forward + Vector3(-0.08, 0, 0)).normalized(), 1.0)
 		boss_shot_fired.emit(right_cannon.global_position, (forward + Vector3(0.08, 0, 0)).normalized(), 1.0)
+		
+		# Cannon recoil animation
+		if left_cannon_mesh and right_cannon_mesh:
+			var tw = create_tween()
+			left_cannon_mesh.position.z = 0.2
+			right_cannon_mesh.position.z = 0.2
+			tw.tween_property(left_cannon_mesh, "position:z", 0.4, 0.15)
+			tw.parallel().tween_property(right_cannon_mesh, "position:z", 0.4, 0.15)
 
 func take_damage(amount: float) -> void:
 	if is_dead or not is_active:
@@ -145,11 +163,16 @@ func _flash() -> void:
 	tween.tween_property(boss_mesh, "scale", Vector3.ONE, 0.1)
 
 func _defeat() -> void:
+	if is_dead:
+		return
 	is_dead = true
 	is_active = false
 	SoundManager.play("explosion")
 	GameManager.add_coins(coin_reward)
 	boss_defeated.emit()
+	
+	set_deferred("monitoring", false)
+	set_deferred("monitorable", false)
 	
 	var tween = create_tween()
 	tween.tween_property(boss_mesh, "rotation_degrees:x", -30.0, 0.4)

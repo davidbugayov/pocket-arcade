@@ -3,6 +3,7 @@ extends Node
 # Pocket Arcade: Squad Rush - Global Game Manager
 
 const SAVE_PATH = "user://squad_rush_save.json"
+const TEMP_SAVE_PATH = "user://squad_rush_save.json.tmp"
 
 signal coins_changed(new_coins: int)
 signal upgrades_changed()
@@ -15,7 +16,7 @@ var sound_enabled: bool = true
 # Upgrade levels (0-based)
 var upgrade_squad_size: int = 0     # +1 starting squad per level
 var upgrade_damage: int = 0         # +25% damage per level
-var upgrade_fire_rate: int = 0      # +10% fire rate per level
+var upgrade_fire_rate: int = 0      # +12% fire rate per level
 
 # Weapons: 0 = Rifle, 1 = Shotgun, 2 = Minigun
 var current_weapon_index: int = 0
@@ -125,12 +126,14 @@ func buy_weapon(idx: int) -> bool:
 	return true
 
 func select_weapon(idx: int) -> void:
-	if idx in unlocked_weapons:
+	if idx in unlocked_weapons and idx >= 0 and idx < WEAPON_DATA.size():
 		current_weapon_index = idx
 		save_game()
 		upgrades_changed.emit()
 
 func add_coins(amount: int) -> void:
+	if amount <= 0:
+		return
 	coins += amount
 	run_coins += amount
 	coins_changed.emit(coins)
@@ -142,6 +145,11 @@ func reset_run_stats() -> void:
 func complete_level(level_num: int) -> void:
 	if level_num >= highest_unlocked_level and highest_unlocked_level < 3:
 		highest_unlocked_level = level_num + 1
+	# Coins and progress persisted uniformly
+	save_game()
+
+func record_defeat() -> void:
+	# Persist earned coins and stats immediately on defeat
 	save_game()
 
 func toggle_sound() -> bool:
@@ -149,8 +157,25 @@ func toggle_sound() -> bool:
 	save_game()
 	return sound_enabled
 
-func save_game() -> void:
-	var data = {
+func _sanitize_state() -> Dictionary:
+	coins = maxi(0, coins)
+	highest_unlocked_level = clampi(highest_unlocked_level, 1, 3)
+	upgrade_squad_size = clampi(upgrade_squad_size, 0, 50)
+	upgrade_damage = clampi(upgrade_damage, 0, 50)
+	upgrade_fire_rate = clampi(upgrade_fire_rate, 0, 50)
+	current_weapon_index = clampi(current_weapon_index, 0, WEAPON_DATA.size() - 1)
+	
+	if 0 not in unlocked_weapons:
+		unlocked_weapons.append(0)
+	
+	var clean_weapons: Array[int] = []
+	for w in unlocked_weapons:
+		var wid = int(w)
+		if wid >= 0 and wid < WEAPON_DATA.size() and wid not in clean_weapons:
+			clean_weapons.append(wid)
+	unlocked_weapons = clean_weapons
+	
+	return {
 		"coins": coins,
 		"highest_unlocked_level": highest_unlocked_level,
 		"sound_enabled": sound_enabled,
@@ -160,38 +185,96 @@ func save_game() -> void:
 		"current_weapon_index": current_weapon_index,
 		"unlocked_weapons": unlocked_weapons,
 	}
-	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify(data, "  "))
-		file.close()
+
+func save_game() -> void:
+	var data = _sanitize_state()
+	var json_str = JSON.stringify(data, "  ")
+	
+	# Atomic write: write to temp file first, then atomically rename to avoid partial writes
+	var temp_file = FileAccess.open(TEMP_SAVE_PATH, FileAccess.WRITE)
+	if not temp_file:
+		# Fallback to direct write if temp path fails
+		var direct_file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+		if direct_file:
+			direct_file.store_string(json_str)
+			direct_file.flush()
+			direct_file.close()
+		return
+	
+	temp_file.store_string(json_str)
+	temp_file.flush()
+	temp_file.close()
+	
+	# Verify temp file is non-empty before replacing main save
+	var verify_file = FileAccess.open(TEMP_SAVE_PATH, FileAccess.READ)
+	if verify_file:
+		var written_len = verify_file.get_length()
+		verify_file.close()
+		if written_len > 10:
+			# Atomic replace
+			if FileAccess.file_exists(SAVE_PATH):
+				DirAccess.remove_absolute(SAVE_PATH)
+			var err = DirAccess.rename_absolute(TEMP_SAVE_PATH, SAVE_PATH)
+			if err != OK:
+				# If rename failed, copy content directly
+				var main_file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+				if main_file:
+					main_file.store_string(json_str)
+					main_file.flush()
+					main_file.close()
+				DirAccess.remove_absolute(TEMP_SAVE_PATH)
 
 func load_game() -> void:
+	var path_to_load = SAVE_PATH
 	if not FileAccess.file_exists(SAVE_PATH):
-		return
-	var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
+		if FileAccess.file_exists(TEMP_SAVE_PATH):
+			path_to_load = TEMP_SAVE_PATH
+		else:
+			return
+	
+	var file = FileAccess.open(path_to_load, FileAccess.READ)
 	if not file:
 		return
+	
 	var content = file.get_as_text()
 	file.close()
-	var test_json_conv = JSON.new()
-	var parse_err = test_json_conv.parse(content)
+	
+	var parser = JSON.new()
+	var parse_err = parser.parse(content)
 	if parse_err != OK:
+		# Corrupted main file, check backup
+		if path_to_load == SAVE_PATH and FileAccess.file_exists(TEMP_SAVE_PATH):
+			var b_file = FileAccess.open(TEMP_SAVE_PATH, FileAccess.READ)
+			if b_file:
+				var b_content = b_file.get_as_text()
+				b_file.close()
+				if parser.parse(b_content) == OK:
+					_apply_loaded_data(parser.get_data())
 		return
-	var data = test_json_conv.get_data()
+	
+	_apply_loaded_data(parser.get_data())
+
+func _apply_loaded_data(data: Variant) -> void:
 	if typeof(data) != TYPE_DICTIONARY:
 		return
 	
-	coins = int(data.get("coins", 0))
+	coins = maxi(0, int(data.get("coins", 0)))
 	highest_unlocked_level = clampi(int(data.get("highest_unlocked_level", 1)), 1, 3)
 	sound_enabled = bool(data.get("sound_enabled", true))
-	upgrade_squad_size = int(data.get("upgrade_squad_size", 0))
-	upgrade_damage = int(data.get("upgrade_damage", 0))
-	upgrade_fire_rate = int(data.get("upgrade_fire_rate", 0))
-	current_weapon_index = int(data.get("current_weapon_index", 0))
+	upgrade_squad_size = clampi(int(data.get("upgrade_squad_size", 0)), 0, 50)
+	upgrade_damage = clampi(int(data.get("upgrade_damage", 0)), 0, 50)
+	upgrade_fire_rate = clampi(int(data.get("upgrade_fire_rate", 0)), 0, 50)
+	current_weapon_index = clampi(int(data.get("current_weapon_index", 0)), 0, WEAPON_DATA.size() - 1)
+	
 	var unl_w = data.get("unlocked_weapons", [0])
 	unlocked_weapons.clear()
-	for w in unl_w:
-		unlocked_weapons.append(int(w))
+	if typeof(unl_w) == TYPE_ARRAY:
+		for w in unl_w:
+			var wid = int(w)
+			if wid >= 0 and wid < WEAPON_DATA.size() and wid not in unlocked_weapons:
+				unlocked_weapons.append(wid)
+	
 	if 0 not in unlocked_weapons:
 		unlocked_weapons.append(0)
-
+	
+	_sanitize_state()

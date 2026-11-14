@@ -31,6 +31,9 @@ var level_controller: LevelBase
 @onready var retry_btn: Button = $GameOverOverlay/VBox/RetryBtn
 @onready var menu_btn: Button = $GameOverOverlay/VBox/MenuBtn
 
+var damage_flash_rect: ColorRect
+var toast_label: Label
+
 var start_z: float = 0.0
 var end_z: float = -200.0
 
@@ -38,6 +41,9 @@ func _ready() -> void:
 	boss_container.visible = false
 	pause_overlay.visible = false
 	game_over_overlay.visible = false
+	
+	_create_damage_flash_overlay()
+	_create_toast_ui()
 	
 	pause_button.pressed.connect(_on_pause_pressed)
 	$PauseOverlay/VBox/ResumeBtn.pressed.connect(_on_resume_pressed)
@@ -50,6 +56,49 @@ func _ready() -> void:
 	menu_btn.pressed.connect(func(): menu_requested.emit())
 	
 	_update_sound_btn_text()
+
+func _create_damage_flash_overlay() -> void:
+	damage_flash_rect = ColorRect.new()
+	damage_flash_rect.name = "DamageFlashOverlay"
+	damage_flash_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	damage_flash_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	damage_flash_rect.color = Color(1.0, 0.0, 0.0, 0.0)
+	add_child(damage_flash_rect)
+
+func _create_toast_ui() -> void:
+	toast_label = Label.new()
+	toast_label.name = "ToastLabel"
+	toast_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	toast_label.offset_top = 220.0
+	toast_label.offset_bottom = 280.0
+	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	toast_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	toast_label.theme_override_font_sizes/font_size = 32
+	toast_label.theme_override_colors/font_color = Color(1.0, 0.9, 0.2)
+	toast_label.theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
+	toast_label.theme_override_constants/shadow_offset_y = 3
+	toast_label.visible = false
+	add_child(toast_label)
+
+func trigger_damage_flash() -> void:
+	if not is_instance_valid(damage_flash_rect):
+		return
+	damage_flash_rect.color = Color(1.0, 0.05, 0.05, 0.32)
+	var tw = create_tween()
+	tw.tween_property(damage_flash_rect, "color", Color(1.0, 0.0, 0.0, 0.0), 0.25).set_trans(Tween.TRANS_SINE)
+
+func show_toast(msg: String) -> void:
+	if not is_instance_valid(toast_label):
+		return
+	toast_label.text = msg
+	toast_label.visible = true
+	toast_label.modulate = Color(1, 1, 1, 1)
+	toast_label.scale = Vector2(1.2, 1.2)
+	var tw = create_tween()
+	tw.tween_property(toast_label, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK)
+	tw.tween_interval(1.2)
+	tw.tween_property(toast_label, "modulate:a", 0.0, 0.3)
+	tw.finished.connect(func(): toast_label.visible = false)
 
 func setup_level(level: LevelBase) -> void:
 	level_controller = level
