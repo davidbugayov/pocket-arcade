@@ -20,6 +20,7 @@ var upgrade_fire_rate: int = 0      # +12% fire rate per level
 
 # Weapons: 0 = Rifle, 1 = Shotgun, 2 = Minigun
 var current_weapon_index: int = 0
+var run_weapon_index: int = -1 # Temporary in-run weapon override (-1 = use current_weapon_index)
 var unlocked_weapons: Array[int] = [0] # 0 always unlocked
 
 # In-run transient state
@@ -36,34 +37,34 @@ const WEAPON_DATA = [
 	{
 		"id": 0,
 		"name": "Assault Rifle",
-		"desc": "Balanced rate and precision",
-		"damage": 12.0,
-		"fire_delay": 0.22,
-		"bullet_speed": 40.0,
+		"desc": "High precision & rapid fire velocity",
+		"damage": 1.6,
+		"fire_delay": 0.20,
+		"bullet_speed": 44.0,
 		"spread_count": 1,
-		"color": Color(0.2, 0.8, 1.0),
+		"color": Color(0.2, 0.85, 1.0),
 		"cost": 0,
 	},
 	{
 		"id": 1,
 		"name": "Combat Shotgun",
-		"desc": "3-pellet heavy spread",
-		"damage": 9.0,
+		"desc": "Heavy 4-pellet spread; deadly at close range",
+		"damage": 1.0,
 		"fire_delay": 0.38,
-		"bullet_speed": 36.0,
-		"spread_count": 3,
-		"color": Color(1.0, 0.6, 0.1),
+		"bullet_speed": 35.0,
+		"spread_count": 4,
+		"color": Color(1.0, 0.60, 0.12),
 		"cost": 150,
 	},
 	{
 		"id": 2,
 		"name": "Plasma Minigun",
-		"desc": "Rapid-fire plasma stream",
-		"damage": 7.0,
-		"fire_delay": 0.11,
-		"bullet_speed": 46.0,
+		"desc": "Rapid plasma stream; supreme continuous suppression",
+		"damage": 0.8,
+		"fire_delay": 0.08,
+		"bullet_speed": 48.0,
 		"spread_count": 1,
-		"color": Color(0.9, 0.2, 1.0),
+		"color": Color(0.85, 0.25, 1.0),
 		"cost": 300,
 	}
 ]
@@ -98,9 +99,20 @@ func get_fire_rate_multiplier() -> float:
 	return 1.0 + (upgrade_fire_rate * 0.12)
 
 func get_weapon_data(idx: int = -1) -> Dictionary:
-	var id = current_weapon_index if idx < 0 else idx
+	var id: int
+	if idx >= 0:
+		id = idx
+	elif run_weapon_index >= 0:
+		id = run_weapon_index
+	else:
+		id = current_weapon_index
 	id = clampi(id, 0, WEAPON_DATA.size() - 1)
 	return WEAPON_DATA[id]
+
+func select_run_weapon(idx: int) -> void:
+	if idx >= 0 and idx < WEAPON_DATA.size():
+		run_weapon_index = idx
+		upgrades_changed.emit()
 
 func get_upgrade_cost(type: String) -> int:
 	var lvl = 0
@@ -158,6 +170,7 @@ func add_coins(amount: int) -> void:
 func reset_run_stats() -> void:
 	run_coins = 0
 	run_kills = 0
+	run_weapon_index = -1
 
 func complete_level(level_num: int) -> void:
 	if level_num >= highest_unlocked_level and highest_unlocked_level < 3:

@@ -165,11 +165,15 @@ func _process(delta: float) -> void:
 	coins_label.text = str(GameManager.run_coins)
 
 	fps_log_timer += delta
-	if fps_log_timer >= 1.0:
+	if fps_log_timer >= 0.5:
 		fps_log_timer = 0.0
 		var current_fps = Engine.get_frames_per_second()
+		var frame_time = Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+		var draw_calls = Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
+		var objects = Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)
+		var primitives = Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)
 		var sq_size = level_controller.player_squad.squad_count
-		print("[PERF_METRICS] FPS: %d | Squad size: %d | Progress: %d%%" % [current_fps, sq_size, int(pct)])
+		print("[PERF_METRICS] FPS: %d | FrameTime: %.2f ms | DrawCalls: %d | Objects: %d | Triangles: %d | Squad: %d | Progress: %d%%" % [current_fps, frame_time, draw_calls, objects, primitives, sq_size, int(pct)])
 
 func show_boss_bar(b_name: String, max_hp: float) -> void:
 	boss_name_label.text = b_name.to_upper()

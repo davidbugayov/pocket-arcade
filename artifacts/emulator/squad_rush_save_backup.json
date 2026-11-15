@@ -1,0 +1,14 @@
+{
+  "coins": 4945,
+  "current_weapon_index": 1,
+  "highest_unlocked_level": 3,
+  "sound_enabled": true,
+  "unlocked_weapons": [
+    0,
+    2,
+    1
+  ],
+  "upgrade_damage": 1,
+  "upgrade_fire_rate": 1,
+  "upgrade_squad_size": 1
+}

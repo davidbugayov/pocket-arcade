@@ -72,12 +72,76 @@ func _create_visuals() -> void:
 		add_child(collision_shape)
 
 static var last_hit_sound_time: float = -1.0
+static var spark_quad: QuadMesh = null
+static var mat_spark_player: StandardMaterial3D = null
+static var mat_spark_enemy: StandardMaterial3D = null
+static var spark_pool: Array[MeshInstance3D] = []
+const MAX_POOL_SIZE: int = 24
 
 func _play_hit_sound() -> void:
 	var cur_t = Time.get_ticks_msec() * 0.001
 	if cur_t - last_hit_sound_time >= 0.06:
 		last_hit_sound_time = cur_t
 		SoundManager.play("hit", 0.08)
+
+func _spawn_hit_spark(hit_pos: Vector3) -> void:
+	if not is_inside_tree():
+		return
+	var parent_node = get_parent()
+	if not parent_node:
+		return
+
+	if spark_quad == null:
+		spark_quad = QuadMesh.new()
+		spark_quad.size = Vector2(0.38, 0.38)
+
+	if mat_spark_player == null:
+		mat_spark_player = StandardMaterial3D.new()
+		mat_spark_player.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+		mat_spark_player.albedo_color = Color(1.0, 0.88, 0.30)
+		mat_spark_player.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+
+		mat_spark_enemy = StandardMaterial3D.new()
+		mat_spark_enemy.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+		mat_spark_enemy.albedo_color = Color(1.0, 0.32, 0.15)
+		mat_spark_enemy.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+
+	# Prune any freed or invalid sparks from previous runs/scenes
+	var valid_sparks: Array[MeshInstance3D] = []
+	var s: MeshInstance3D = null
+	for item in spark_pool:
+		if is_instance_valid(item):
+			valid_sparks.append(item)
+			if s == null and not item.visible:
+				s = item
+	spark_pool = valid_sparks
+
+	if s == null:
+		if spark_pool.size() < MAX_POOL_SIZE:
+			s = MeshInstance3D.new()
+			s.mesh = spark_quad
+			parent_node.add_child(s)
+			spark_pool.append(s)
+		elif spark_pool.size() > 0:
+			s = spark_pool[randi() % spark_pool.size()]
+
+	if not is_instance_valid(s):
+		return
+
+	if s.get_parent() != parent_node:
+		if s.get_parent():
+			s.get_parent().remove_child(s)
+		parent_node.add_child(s)
+
+	s.material_override = mat_spark_player if is_player_bullet else mat_spark_enemy
+	s.position = hit_pos
+	s.scale = Vector3(0.4, 0.4, 0.4)
+	s.visible = true
+
+	var tw = s.create_tween()
+	tw.tween_property(s, "scale", Vector3(1.6, 1.6, 1.6), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(s, "scale", Vector3(0.01, 0.01, 0.01), 0.04).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(func(): if is_instance_valid(s): s.visible = false)
 
 func _physics_process(delta: float) -> void:
 	if has_hit:
@@ -87,8 +151,8 @@ func _physics_process(delta: float) -> void:
 	var start_pos = global_position
 	var end_pos = start_pos + direction * move_dist
 
-	# Continuous raycast check on large steps ensures zero tunneling
-	if move_dist > 0.8:
+	# Continuous raycast check ensures zero tunneling through thin targets (e.g. 0.4m gates) across all speeds & framerates
+	if move_dist > 0.001:
 		var world = get_world_3d()
 		if world:
 			var space_state = world.direct_space_state
@@ -115,6 +179,7 @@ func _on_area_entered(area: Area3D) -> void:
 	if has_hit:
 		return
 
+	var hit_pos = global_position if is_inside_tree() else Vector3.ZERO
 	if is_player_bullet:
 		# Player bullet can hit shootable gates, enemies, boss, or obstacles
 		if area.name == "GateShootableHitbox" or area.has_method("on_bullet_hit"):
@@ -123,11 +188,13 @@ func _on_area_entered(area: Area3D) -> void:
 				area.on_bullet_hit(damage)
 			elif area.get_parent() and area.get_parent().has_method("on_bullet_hit"):
 				area.get_parent().on_bullet_hit(damage)
-			SoundManager.play("hit", 0.08)
+			_spawn_hit_spark(hit_pos)
+			_play_hit_sound()
 			queue_free()
 		elif area.has_method("take_damage"):
 			has_hit = true
 			area.take_damage(damage)
+			_spawn_hit_spark(hit_pos)
 			_play_hit_sound()
 			queue_free()
 	else:
@@ -138,6 +205,7 @@ func _on_area_entered(area: Area3D) -> void:
 		if area.has_method("take_damage") and not (area is EnemyUnit or area is BossUnit):
 			has_hit = true
 			area.take_damage(damage)
+			_spawn_hit_spark(hit_pos)
 			_play_hit_sound()
 			queue_free()
 
@@ -145,6 +213,7 @@ func _on_body_entered(body: Node3D) -> void:
 	if has_hit:
 		return
 
+	var hit_pos = global_position if is_inside_tree() else Vector3.ZERO
 	if is_player_bullet:
 		# Player bullet: NEVER hurt player squad
 		if body is PlayerSquad:
@@ -153,6 +222,7 @@ func _on_body_entered(body: Node3D) -> void:
 			has_hit = true
 			if body.has_method("take_damage"):
 				body.take_damage(damage)
+			_spawn_hit_spark(hit_pos)
 			_play_hit_sound()
 			queue_free()
 	else:
@@ -162,10 +232,12 @@ func _on_body_entered(body: Node3D) -> void:
 		if body is PlayerSquad:
 			has_hit = true
 			body.take_damage(damage)
+			_spawn_hit_spark(hit_pos)
 			_play_hit_sound()
 			queue_free()
 		elif body.has_method("take_damage") and not (body is Obstacle):
 			has_hit = true
 			body.take_damage(damage)
+			_spawn_hit_spark(hit_pos)
 			_play_hit_sound()
 			queue_free()

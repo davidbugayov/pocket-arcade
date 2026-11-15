@@ -106,7 +106,36 @@ All external 3D models were discovered, inspected, and fetched via the Polyfork 
 
 ---
 
-## 4. Soldiers (Stylized Low-Poly Soldier System)
-- **Author**: Custom high-performance modular soldier model (`StylizedSoldier.gd`) engineered for 60 FPS mobile performance with 50+ combatants.
-- **Components**: Tactical combat helmet, glowing visor (Cyan for blue allies, Red/Amber for enemies), plate carrier vest, articulated shoulder guards, dual-grip weapon holding arms with firing recoil kickback, and stride-animated running legs.
-- **Animation**: Procedural walk/run cycle, firing recoil with muzzle flash, spawn scale-pop, and defeat tumbling ragdoll fade.
+## 4. Soldiers (Stylized Low-Poly Soldier System & Polyfork Comparison)
+
+### External Asset Evaluation (Polyfork Free Catalog)
+- **Inspected Models**:
+  - `Infantry Rifleman` (`https://polyfork.dev/asset/infantry-rifleman-c1c0a5`): 3,651 triangles, 30 skeleton bones, unrigged/unanimated, realistic WWII infantry uniform.
+  - `Squad Officer` (`https://polyfork.dev/asset/squad-officer-e5c52b`): 3,279 triangles, 30 skeleton bones, unrigged, realistic WWII officer uniform.
+- **Why External Models Were Not Selected for Squad Combatants**:
+  1. *Performance & Render Budget*: 60 combatants with 3,651 triangles each would submit 219,060 skinned triangles and evaluate 60 skeletal node graphs per frame on the mobile Mali-G76 MC4 GPU, causing catastrophic frame drops below 10 FPS.
+  2. *Artistic Direction & Readability*: The elevated 45° camera perspective requires bold, rounded, high-contrast silhouettes. Realistic WWII trench uniforms with drab muddy colors and realistic human proportions become unreadable dark smudges on mobile screens.
+  3. *Animation Needs*: Polyfork character models lack built-in running, banking tilt, weapon recoil kickback, and casualty tumble animations.
+
+### Custom Stylized Rounded Fighter System (`StylizedSoldier.gd`)
+- **Author**: Custom high-performance modular soldier model engineered specifically for stable 30-60 FPS performance on mid-range Android devices with 60 combatants.
+- **Silhouette & Geometry**:
+  - Oversized rounded combat helmet dome with flared brow visor rim and ear protection pads.
+  - High-emission glowing panoramic tactical visor band (luminous Cyan for allies, fiery Amber/Ruby for enemies) ensuring instant readability from 30+ meters away in camera view.
+  - Compact contoured plate carrier armor vest with rounded collar and shoulder pauldrons.
+  - Two-handed ready weapon grip firmly holding weapons at chest level.
+  - Rounded capsule limbs with combat boots.
+- **Coherent Gear Variations**:
+  - *Variant 0: Heavy Trooper* — Reinforced heavy collar, dual shoulder pauldrons, solid tactical belt.
+  - *Variant 1: Tactical Specialist* — Helmet communications box with radio antenna mast, dual chest magazine pouches.
+  - *Variant 2: Scout / Breacher* — Brow sensor goggles, diagonal combat bandolier strap, rear survival/radio pack.
+  - *Color Harmonization* — Subtle uniform fabric tint shifts (classic tactical navy, dark stealth navy, bright cobalt).
+- **Procedural Animations**:
+  - Energetic bouncy running stride with vertical body bobbing.
+  - Dynamic banking tilt into turns when swiping left/right.
+  - Snappy weapon recoil kickback with muzzle flash star.
+  - Expressive defeat tumbling ragdoll fall and dissolve.
+- **Rendering Architecture**:
+  - Pre-baked shared procedural `ArrayMesh` surfaces via `SurfaceTool` with 100% shared static materials.
+  - Pre-baked single-draw-call weapon meshes.
+  - Articulated 4-mesh front rows + single-mesh 1-draw-call rear row LOD, reducing squad draw calls from 3,800 to ~90-120 draw calls.

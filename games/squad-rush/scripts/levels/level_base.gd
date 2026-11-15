@@ -25,6 +25,10 @@ var tutorial_triggers: Array[Dictionary] = []
 
 var camera_shake_trauma: float = 0.0
 
+var is_benchmarking: bool = false
+var benchmark_timer: float = 0.0
+var benchmark_stage: int = 0
+
 signal level_won()
 signal level_lost()
 
@@ -40,6 +44,10 @@ func _ready() -> void:
 
 	is_game_active = true
 	is_level_completed = false
+
+	if FileAccess.file_exists("/sdcard/squad_rush_benchmark.flag") or FileAccess.file_exists("user://benchmark.flag"):
+		is_benchmarking = true
+		print("[BENCHMARK] Mode activated! Beginning 10 -> 30 -> 60 squad benchmark.")
 
 func _setup_containers() -> void:
 	bullets_container = Node3D.new()
@@ -115,6 +123,24 @@ func _build_level_layout() -> void:
 	pass
 
 func _process(delta: float) -> void:
+	if is_benchmarking and is_instance_valid(player_squad):
+		benchmark_timer += delta
+		if benchmark_stage == 0 and benchmark_timer >= 0.5:
+			benchmark_stage = 1
+			print("[BENCHMARK] Stage 1: Setting squad size to 10")
+			player_squad.set_squad_size(10)
+		elif benchmark_stage == 1 and benchmark_timer >= 3.5:
+			benchmark_stage = 2
+			print("[BENCHMARK] Stage 2: Setting squad size to 30")
+			player_squad.set_squad_size(30)
+		elif benchmark_stage == 2 and benchmark_timer >= 6.5:
+			benchmark_stage = 3
+			print("[BENCHMARK] Stage 3: Setting squad size to 60")
+			player_squad.set_squad_size(60)
+		elif benchmark_stage == 3 and benchmark_timer >= 10.0:
+			benchmark_stage = 4
+			print("[BENCHMARK] Completed 10/30/60 benchmark run!")
+
 	if is_instance_valid(player_squad) and is_instance_valid(camera):
 		var target_pos = Vector3(
 			player_squad.position.x * 0.35,
@@ -210,9 +236,9 @@ func spawn_obstacle(pos: Vector3, type: Obstacle.ObstacleType, hp: float, coins:
 	obstacles_container.add_child(obs)
 	return obs
 
-func spawn_enemy(pos: Vector3, hp: float, coins: int, moves: bool = false) -> EnemyUnit:
+func spawn_enemy(pos: Vector3, hp: float, coins: int, moves: bool = false, type: int = 1) -> EnemyUnit:
 	var enemy = EnemyUnit.new()
-	enemy.setup(hp, coins, moves)
+	enemy.setup(hp, coins, moves, type)
 	enemy.position = pos
 	enemies_container.add_child(enemy)
 	enemy.enemy_shot_fired.connect(_on_enemy_shot_fired)

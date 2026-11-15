@@ -158,7 +158,7 @@ func _on_body_entered(body: Node3D) -> void:
 	if body is PlayerSquad:
 		is_collected = true
 		SoundManager.play("weapon_upgrade")
-		GameManager.select_weapon(weapon_id_to_grant)
+		GameManager.select_run_weapon(weapon_id_to_grant)
 
 		weapon_collected.emit(weapon_id_to_grant, pickup_name)
 

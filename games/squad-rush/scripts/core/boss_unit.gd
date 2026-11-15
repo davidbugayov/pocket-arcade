@@ -14,22 +14,22 @@ enum BossType {
 
 @export var boss_name: String = "Iron Sentinel"
 @export var boss_type: BossType = BossType.HEAVY_ROBOT
-@export var max_hp: float = 300.0
-@export var coin_reward: int = 100
+@export var max_hp: float = 950.0
+@export var coin_reward: int = 120
 
-var current_hp: float = 300.0
+var current_hp: float = 950.0
 var is_active: bool = false
 var is_dead: bool = false
 
 var move_direction: float = 1.0
-var move_speed: float = 2.5
-var bridge_limit_x: float = 3.2
+var move_speed: float = 2.0
+var bridge_limit_x: float = 2.8
 
-var attack_timer: float = 1.0
-var attack_interval: float = 1.8
+var attack_timer: float = 1.2
+var attack_interval: float = 2.2
 var is_telegraphing: bool = false
 var telegraph_timer: float = 0.0
-const TELEGRAPH_DURATION: float = 0.38
+const TELEGRAPH_DURATION: float = 0.75
 
 var boss_mesh_root: Node3D
 var model_instance: Node3D
@@ -45,6 +45,19 @@ var telegraph_laser_left: MeshInstance3D
 var telegraph_laser_right: MeshInstance3D
 var telegraph_charge_left: MeshInstance3D
 var telegraph_charge_right: MeshInstance3D
+
+# Lane sweep indicators for Heavy Robot
+var lane_telegraph_mesh: MeshInstance3D
+var robot_target_lane_x: float = 0.0
+var robot_attack_step: int = 0
+const ROBOT_LANES: Array[float] = [-2.1, 2.1, 0.0, -2.1]
+
+# Blast zone indicator for Tank
+var tank_blast_marker: MeshInstance3D
+var tank_target_x: float = 0.0
+
+# Dread Titan attack alternation
+var titan_attack_toggle: bool = false
 
 static var boss_models = {
 	BossType.HEAVY_ROBOT: load("res://assets/models/service_robot.glb"),
@@ -63,7 +76,7 @@ func _ready() -> void:
 
 func setup(p_name: String, p_hp: float, p_coins: int, p_type: int = -1) -> void:
 	boss_name = p_name
-	max_hp = p_hp
+	max_hp = p_hp if p_hp > 0 else 950.0
 	current_hp = max_hp
 	coin_reward = p_coins
 
@@ -102,16 +115,16 @@ func _rebuild_boss_visuals() -> void:
 	# Laser / charge material
 	var mat_laser = StandardMaterial3D.new()
 	mat_laser.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-	mat_laser.albedo_color = Color(1.0, 0.15, 0.1, 0.75)
+	mat_laser.albedo_color = Color(1.0, 0.15, 0.1, 0.85)
 	mat_laser.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 
 	var mat_charge = StandardMaterial3D.new()
 	mat_charge.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-	mat_charge.albedo_color = Color(1.0, 0.35, 0.1, 0.9)
+	mat_charge.albedo_color = Color(1.0, 0.40, 0.05, 0.95)
 
 	match boss_type:
 		BossType.HEAVY_ROBOT:
-			# Iron Sentinel: 3.8m tall heavy mech
+			# Iron Sentinel: 3.8m tall heavy bipedal mech
 			if model_instance:
 				model_instance.scale = Vector3(2.2, 2.2, 2.2)
 				model_instance.rotation_degrees = Vector3(0, 0, 0)
@@ -143,12 +156,12 @@ func _rebuild_boss_visuals() -> void:
 				# Telegraph Laser Beam
 				var laser = MeshInstance3D.new()
 				var cyl = CylinderMesh.new()
-				cyl.top_radius = 0.03
-				cyl.bottom_radius = 0.03
-				cyl.height = 20.0
+				cyl.top_radius = 0.04
+				cyl.bottom_radius = 0.04
+				cyl.height = 36.0
 				laser.mesh = cyl
 				laser.rotation_degrees.x = 90.0
-				laser.position = Vector3(0, 0, 10.0)
+				laser.position = Vector3(0, 0, 18.0)
 				laser.material_override = mat_laser
 				laser.visible = false
 				muzzle.add_child(laser)
@@ -156,8 +169,8 @@ func _rebuild_boss_visuals() -> void:
 				# Muzzle charge indicator
 				var charge = MeshInstance3D.new()
 				var sph = SphereMesh.new()
-				sph.radius = 0.18
-				sph.height = 0.36
+				sph.radius = 0.22
+				sph.height = 0.44
 				charge.mesh = sph
 				charge.material_override = mat_charge
 				charge.visible = false
@@ -172,11 +185,26 @@ func _rebuild_boss_visuals() -> void:
 					telegraph_laser_right = laser
 					telegraph_charge_right = charge
 
+			# Red lane telegraph ground projector
+			lane_telegraph_mesh = MeshInstance3D.new()
+			var l_quad = QuadMesh.new()
+			l_quad.size = Vector2(2.4, 38.0)
+			lane_telegraph_mesh.mesh = l_quad
+			lane_telegraph_mesh.rotation_degrees.x = -90.0
+			lane_telegraph_mesh.position = Vector3(0, 0.04, 19.0)
+			var lane_mat = StandardMaterial3D.new()
+			lane_mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+			lane_mat.albedo_color = Color(1.0, 0.12, 0.12, 0.42)
+			lane_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			lane_telegraph_mesh.material_override = lane_mat
+			lane_telegraph_mesh.visible = false
+			add_child(lane_telegraph_mesh)
+
 		BossType.TANK:
 			# Heavy War Tank
 			if model_instance:
 				model_instance.scale = Vector3(1.05, 1.05, 1.05)
-				model_instance.rotation_degrees = Vector3(0, 0, 0) # Cannon faces +Z towards player
+				model_instance.rotation_degrees = Vector3(0, 0, 0)
 				tank_turret_node = model_instance.find_child("turret", true, false) as Node3D
 				tank_gun_node = model_instance.find_child("gun", true, false) as Node3D
 
@@ -195,10 +223,10 @@ func _rebuild_boss_visuals() -> void:
 			var cyl = CylinderMesh.new()
 			cyl.top_radius = 0.05
 			cyl.bottom_radius = 0.05
-			cyl.height = 24.0
+			cyl.height = 36.0
 			telegraph_laser_left.mesh = cyl
 			telegraph_laser_left.rotation_degrees.x = 90.0
-			telegraph_laser_left.position = Vector3(0, 0, 12.0)
+			telegraph_laser_left.position = Vector3(0, 0, 18.0)
 			telegraph_laser_left.material_override = mat_laser
 			telegraph_laser_left.visible = false
 			main_cannon.add_child(telegraph_laser_left)
@@ -215,11 +243,27 @@ func _rebuild_boss_visuals() -> void:
 			left_cannon = main_cannon
 			right_cannon = main_cannon
 
+			# Blast zone disc marker on ground
+			tank_blast_marker = MeshInstance3D.new()
+			var disc = CylinderMesh.new()
+			disc.top_radius = 2.2
+			disc.bottom_radius = 2.2
+			disc.height = 0.05
+			tank_blast_marker.mesh = disc
+			tank_blast_marker.position = Vector3(0, 0.05, 20.0)
+			var blast_mat = StandardMaterial3D.new()
+			blast_mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+			blast_mat.albedo_color = Color(1.0, 0.22, 0.05, 0.55)
+			blast_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			tank_blast_marker.material_override = blast_mat
+			tank_blast_marker.visible = false
+			add_child(tank_blast_marker)
+
 		BossType.DREAD_TITAN:
 			# Dread Titan: colossal multi-legged mechanical behemoth
 			if model_instance:
 				model_instance.scale = Vector3(0.52, 0.52, 0.52)
-				model_instance.position.y = 2.05 # Align feet to bridge floor
+				model_instance.position.y = 2.05
 
 			var col_box = BoxShape3D.new()
 			col_box.size = Vector3(3.6, 7.0, 3.2)
@@ -234,20 +278,20 @@ func _rebuild_boss_visuals() -> void:
 
 				var laser = MeshInstance3D.new()
 				var cyl = CylinderMesh.new()
-				cyl.top_radius = 0.04
-				cyl.bottom_radius = 0.04
-				cyl.height = 25.0
+				cyl.top_radius = 0.05
+				cyl.bottom_radius = 0.05
+				cyl.height = 36.0
 				laser.mesh = cyl
 				laser.rotation_degrees.x = 90.0
-				laser.position = Vector3(0, 0, 12.5)
+				laser.position = Vector3(0, 0, 18.0)
 				laser.material_override = mat_laser
 				laser.visible = false
 				muzzle.add_child(laser)
 
 				var charge = MeshInstance3D.new()
 				var sph = SphereMesh.new()
-				sph.radius = 0.25
-				sph.height = 0.5
+				sph.radius = 0.28
+				sph.height = 0.56
 				charge.mesh = sph
 				charge.material_override = mat_charge
 				charge.visible = false
@@ -266,6 +310,7 @@ func _rebuild_boss_visuals() -> void:
 
 func activate() -> void:
 	is_active = true
+	attack_timer = 1.0 # First attack gives player 1.0s to settle before telegraph
 	boss_hp_changed.emit(current_hp, max_hp)
 
 func stop_boss() -> void:
@@ -276,20 +321,35 @@ func _physics_process(delta: float) -> void:
 	if not is_active or is_dead:
 		return
 
-	position.x += move_direction * move_speed * delta
-	if position.x > bridge_limit_x:
-		position.x = bridge_limit_x
-		move_direction = -1.0
-	elif position.x < -bridge_limit_x:
-		position.x = -bridge_limit_x
-		move_direction = 1.0
+	# Movement behavior
+	match boss_type:
+		BossType.HEAVY_ROBOT:
+			# Heavy Robot slides to align with targeted lane
+			position.x = lerpf(position.x, robot_target_lane_x, delta * 5.0)
 
-	# Tank turret aiming toward player X
-	if tank_turret_node:
-		var p_nodes = get_tree().get_nodes_in_group("player")
-		if p_nodes.size() > 0:
-			var p_x = (p_nodes[0] as Node3D).global_position.x - global_position.x
-			tank_turret_node.rotation_degrees.y = clampf(-p_x * 8.0, -22.0, 22.0)
+		BossType.TANK:
+			position.x += move_direction * move_speed * delta
+			if position.x > bridge_limit_x:
+				position.x = bridge_limit_x
+				move_direction = -1.0
+			elif position.x < -bridge_limit_x:
+				position.x = -bridge_limit_x
+				move_direction = 1.0
+
+			if tank_turret_node:
+				var p_nodes = get_tree().get_nodes_in_group("player")
+				if p_nodes.size() > 0:
+					var p_x = (p_nodes[0] as Node3D).global_position.x - global_position.x
+					tank_turret_node.rotation_degrees.y = clampf(-p_x * 8.0, -22.0, 22.0)
+
+		BossType.DREAD_TITAN:
+			position.x += move_direction * (move_speed * 0.75) * delta
+			if position.x > bridge_limit_x * 0.8:
+				position.x = bridge_limit_x * 0.8
+				move_direction = -1.0
+			elif position.x < -bridge_limit_x * 0.8:
+				position.x = -bridge_limit_x * 0.8
+				move_direction = 1.0
 
 	# Attack & Telegraph Cycle
 	if is_telegraphing:
@@ -306,16 +366,49 @@ func _physics_process(delta: float) -> void:
 			_show_telegraph()
 
 func _show_telegraph() -> void:
-	if telegraph_laser_left:
-		telegraph_laser_left.visible = true
-	if telegraph_laser_right:
-		telegraph_laser_right.visible = true
-	if telegraph_charge_left:
-		telegraph_charge_left.visible = true
-	if telegraph_charge_right:
-		telegraph_charge_right.visible = true
+	match boss_type:
+		BossType.HEAVY_ROBOT:
+			# Select lane to sweep
+			robot_target_lane_x = ROBOT_LANES[robot_attack_step % ROBOT_LANES.size()]
+			if lane_telegraph_mesh:
+				lane_telegraph_mesh.position.x = robot_target_lane_x - position.x
+				lane_telegraph_mesh.visible = true
+			if telegraph_laser_left:
+				telegraph_laser_left.visible = true
+			if telegraph_laser_right:
+				telegraph_laser_right.visible = true
+			if telegraph_charge_left:
+				telegraph_charge_left.visible = true
+			if telegraph_charge_right:
+				telegraph_charge_right.visible = true
+
+		BossType.TANK:
+			var p_nodes = get_tree().get_nodes_in_group("player")
+			if p_nodes.size() > 0:
+				tank_target_x = (p_nodes[0] as Node3D).global_position.x
+			if tank_blast_marker:
+				tank_blast_marker.position.x = tank_target_x - position.x
+				tank_blast_marker.visible = true
+			if telegraph_laser_left:
+				telegraph_laser_left.visible = true
+			if telegraph_charge_left:
+				telegraph_charge_left.visible = true
+
+		BossType.DREAD_TITAN:
+			if telegraph_laser_left:
+				telegraph_laser_left.visible = true
+			if telegraph_laser_right:
+				telegraph_laser_right.visible = true
+			if telegraph_charge_left:
+				telegraph_charge_left.visible = true
+			if telegraph_charge_right:
+				telegraph_charge_right.visible = true
 
 func _hide_telegraph() -> void:
+	if lane_telegraph_mesh:
+		lane_telegraph_mesh.visible = false
+	if tank_blast_marker:
+		tank_blast_marker.visible = false
 	if telegraph_laser_left:
 		telegraph_laser_left.visible = false
 	if telegraph_laser_right:
@@ -331,39 +424,51 @@ func _execute_attack() -> void:
 
 	attack_timer = attack_interval
 	SoundManager.play("shoot_shotgun", 0.05)
-	var forward = global_transform.basis.z
+	var forward = Vector3(0, 0, 1)
 
 	match boss_type:
 		BossType.HEAVY_ROBOT:
+			# Lane Sweep: 3 heavy plasma bullets down the telegraphed lane!
 			if left_cannon and right_cannon:
-				boss_shot_fired.emit(left_cannon.global_position, (forward + Vector3(-0.08, 0, 0)).normalized(), 1.0)
-				boss_shot_fired.emit(right_cannon.global_position, (forward + Vector3(0.08, 0, 0)).normalized(), 1.0)
+				boss_shot_fired.emit(left_cannon.global_position, forward, 1.5)
+				boss_shot_fired.emit(right_cannon.global_position, forward, 1.5)
+				boss_shot_fired.emit(global_position + Vector3(0, 2.2, 1.0), forward, 1.5)
+
 				var tw = create_tween()
-				tw.tween_property(boss_mesh_root, "position:z", -0.22, 0.08)
-				tw.tween_property(boss_mesh_root, "position:z", 0.0, 0.14)
+				tw.tween_property(boss_mesh_root, "position:z", -0.30, 0.08)
+				tw.tween_property(boss_mesh_root, "position:z", 0.0, 0.16)
+
+			robot_attack_step += 1
 
 		BossType.TANK:
+			# High Explosive Tank Shell aimed at marked blast zone
 			if main_cannon:
-				# Heavy main cannon shot
-				boss_shot_fired.emit(main_cannon.global_position, forward, 2.0)
-				boss_shot_fired.emit(main_cannon.global_position, (forward + Vector3(-0.12, 0, 0)).normalized(), 1.0)
-				boss_shot_fired.emit(main_cannon.global_position, (forward + Vector3(0.12, 0, 0)).normalized(), 1.0)
+				var dir = (Vector3(tank_target_x - global_position.x, 0, 22.0)).normalized()
+				boss_shot_fired.emit(main_cannon.global_position, dir, 2.5)
+				boss_shot_fired.emit(main_cannon.global_position, (dir + Vector3(-0.08, 0, 0)).normalized(), 1.0)
+				boss_shot_fired.emit(main_cannon.global_position, (dir + Vector3(0.08, 0, 0)).normalized(), 1.0)
 
-				# Tank cannon recoil
 				if tank_gun_node:
 					var tw = create_tween()
 					tank_gun_node.position.z = -0.45
 					tw.tween_property(tank_gun_node, "position:z", 0.0, 0.22)
 
 		BossType.DREAD_TITAN:
-			if left_cannon and right_cannon:
-				boss_shot_fired.emit(left_cannon.global_position, (forward + Vector3(-0.10, 0, 0)).normalized(), 1.5)
-				boss_shot_fired.emit(right_cannon.global_position, (forward + Vector3(0.10, 0, 0)).normalized(), 1.5)
-				boss_shot_fired.emit(global_position + Vector3(0, 3.5, 1.0), forward, 1.5)
+			titan_attack_toggle = !titan_attack_toggle
+			if titan_attack_toggle:
+				# Attack A: 5-projectile spread volley across bridge with gaps to dodge!
+				for a in [-0.22, -0.11, 0.0, 0.11, 0.22]:
+					var s_dir = (forward + Vector3(a, 0, 0)).normalized()
+					boss_shot_fired.emit(global_position + Vector3(0, 3.6, 1.2), s_dir, 1.5)
+			else:
+				# Attack B: Focused twin heavy plasma battery blast down center
+				if left_cannon and right_cannon:
+					boss_shot_fired.emit(left_cannon.global_position, forward, 2.0)
+					boss_shot_fired.emit(right_cannon.global_position, forward, 2.0)
 
-				var tw = create_tween()
-				tw.tween_property(boss_mesh_root, "position:y", 0.25, 0.10)
-				tw.tween_property(boss_mesh_root, "position:y", 0.0, 0.20)
+			var tw = create_tween()
+			tw.tween_property(boss_mesh_root, "position:y", 0.25, 0.10)
+			tw.tween_property(boss_mesh_root, "position:y", 0.0, 0.20)
 
 func take_damage(amount: float) -> void:
 	if is_dead or not is_active:
@@ -398,4 +503,3 @@ func _defeat() -> void:
 	var tween = create_tween()
 	tween.tween_property(boss_mesh_root, "rotation_degrees:x", -30.0, 0.4)
 	tween.parallel().tween_property(boss_mesh_root, "position:y", -3.0, 0.6)
-	tween.parallel().tween_property(boss_mesh_root, "scale", Vector3(0.05, 0.05, 0.05), 0.6)

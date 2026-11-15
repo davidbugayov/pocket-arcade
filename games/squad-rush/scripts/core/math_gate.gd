@@ -30,9 +30,11 @@ var multiplier_bullet_hits: int = 0
 var last_bullet_hit_time: float = -1.0
 
 const MAX_LABEL_DIST: float = 52.0
-const MIN_HIT_INTERVAL: float = 0.16 # Rate-limited token bucket (Real War mechanic)
-const MAX_GATE_VALUE_ADD: int = 50
-const MAX_GATE_VALUE_MULT: int = 5
+const MIN_HIT_INTERVAL: float = 0.22 # Controlled token rate prevents effortless over-upgrades
+const MAX_GATE_VALUE_ADD: int = 20
+const MAX_GATE_VALUE_MULT: int = 3
+var subtract_bullet_hits: int = 0
+var add_bullet_hits: int = 0
 
 func _ready() -> void:
 	_build_visuals()
@@ -198,30 +200,27 @@ func on_bullet_hit(_damage: float = 1.0, ignore_rate_limit: bool = false) -> voi
 			return
 		last_bullet_hit_time = cur_time
 
-	# Real War mechanic: shooting a gate upgrades its bonus
+	# Deliberate gate tuning: upgrades require intentional focus, negative gates don't become free exploits
 	match operation:
 		OperationType.ADD:
 			if value < MAX_GATE_VALUE_ADD:
 				value += 1
 		OperationType.SUBTRACT:
-			value -= 1
-			if value <= 0:
-				operation = OperationType.ADD
-				value = 1 # Turns from penalty into bonus!
+			# Soften penalty down to -1, but prevent automatic conversion to positive exploit
+			if value > 1:
+				value -= 1
 		OperationType.MULTIPLY:
 			multiplier_bullet_hits += 1
-			if multiplier_bullet_hits >= 5:
+			if multiplier_bullet_hits >= 6:
 				multiplier_bullet_hits = 0
 				if value < MAX_GATE_VALUE_MULT:
 					value += 1
 		OperationType.DIVIDE:
 			multiplier_bullet_hits += 1
-			if multiplier_bullet_hits >= 4:
+			if multiplier_bullet_hits >= 6:
 				multiplier_bullet_hits = 0
-				value -= 1
-				if value <= 1:
-					operation = OperationType.MULTIPLY
-					value = 2
+				if value > 2:
+					value -= 1
 
 	_update_display()
 	_punch_text()

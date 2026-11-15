@@ -2,6 +2,13 @@ extends Area3D
 
 class_name EnemyUnit
 
+enum EnemyType {
+	RUNNER,
+	SHOOTER,
+	SHIELDER
+}
+
+@export var enemy_type: EnemyType = EnemyType.SHOOTER
 @export var max_hp: float = 25.0
 @export var damage_to_player: int = 1
 @export var coin_reward: int = 8
@@ -17,16 +24,17 @@ var muzzle_point: Node3D
 var gun_mesh: Node3D
 var muzzle_flash_mesh: MeshInstance3D
 var telegraph_laser: MeshInstance3D
+var shield_mesh: MeshInstance3D
 
 var is_dead: bool = false
 var is_active: bool = true
 
-# Shooting logic
+# Shooting logic (SHOOTER type only)
 var attack_timer: float = 1.0
 var attack_interval: float = 1.8
 var is_telegraphing: bool = false
 var telegraph_timer: float = 0.0
-const TELEGRAPH_DURATION: float = 0.28
+const TELEGRAPH_DURATION: float = 0.45
 const ATTACK_RANGE_Z: float = 42.0
 const MIN_ATTACK_Z: float = 6.0
 
@@ -45,19 +53,66 @@ func _ready() -> void:
 
 	body_entered.connect(_on_body_entered)
 
-func setup(p_hp: float, p_coins: int, p_moves: bool = false) -> void:
+func setup(p_hp: float, p_coins: int, p_moves: bool = false, p_type: int = 1) -> void:
+	enemy_type = p_type as EnemyType
 	max_hp = p_hp
 	current_hp = max_hp
 	coin_reward = p_coins
 	moves_forward = p_moves
+
+	match enemy_type:
+		EnemyType.RUNNER:
+			moves_forward = true
+			move_speed = 5.8
+			damage_to_player = 2
+			max_hp = p_hp if p_hp > 0 else 12.0
+			current_hp = max_hp
+			coin_reward = p_coins if p_coins > 0 else 6
+		EnemyType.SHOOTER:
+			damage_to_player = 1
+			max_hp = p_hp if p_hp > 0 else 20.0
+			current_hp = max_hp
+			coin_reward = p_coins if p_coins > 0 else 8
+		EnemyType.SHIELDER:
+			damage_to_player = 3
+			max_hp = p_hp if p_hp > 0 else 55.0
+			current_hp = max_hp
+			coin_reward = p_coins if p_coins > 0 else 16
+
+	if is_inside_tree():
+		_rebuild_type_visuals()
 	_update_hp_display()
 
 func _build_visuals() -> void:
-	# Stylized Red Enemy Soldier
+	_rebuild_type_visuals()
+
+func _rebuild_type_visuals() -> void:
+	for c in get_children():
+		if c != hp_label and c != hp_bg:
+			remove_child(c)
+			c.queue_free()
+
+	telegraph_laser = null
+	shield_mesh = null
+
 	soldier_model = StylizedSoldier.new()
 	add_child(soldier_model)
 	soldier_model.setup_team(true) # Enemy Team (Crimson armor, amber visor)
-	soldier_model.equip_weapon(0) # Standard rifle
+
+	var var_id = 0
+	match enemy_type:
+		EnemyType.RUNNER:
+			var_id = 0 # Lean scout runner
+			soldier_model.build_soldier(true, var_id)
+			soldier_model.equip_weapon(0)
+		EnemyType.SHOOTER:
+			var_id = 1 # Rifle shooter
+			soldier_model.build_soldier(true, var_id)
+			soldier_model.equip_weapon(0)
+		EnemyType.SHIELDER:
+			var_id = 1 # Heavy trooper with shield
+			soldier_model.build_soldier(true, var_id)
+			soldier_model.equip_weapon(0)
 
 	muzzle_point = soldier_model.muzzle_point
 	gun_mesh = soldier_model.weapon_mount
@@ -67,40 +122,73 @@ func _build_visuals() -> void:
 	if t_m is MeshInstance3D:
 		body_mesh = t_m
 
-	# Aiming Telegraph Indicator (Bright red aiming laser)
-	telegraph_laser = MeshInstance3D.new()
-	var l_mesh = CylinderMesh.new()
-	l_mesh.top_radius = 0.02
-	l_mesh.bottom_radius = 0.02
-	l_mesh.height = 14.0
-	telegraph_laser.mesh = l_mesh
-	telegraph_laser.rotation_degrees.x = 90.0
-	telegraph_laser.position = Vector3(0, 0.45, 7.0)
+	if enemy_type == EnemyType.SHOOTER:
+		# Aiming Telegraph Laser (Bright red aiming laser matching bullet trajectory)
+		telegraph_laser = MeshInstance3D.new()
+		var l_mesh = CylinderMesh.new()
+		l_mesh.top_radius = 0.02
+		l_mesh.bottom_radius = 0.02
+		l_mesh.height = 18.0
+		telegraph_laser.mesh = l_mesh
+		telegraph_laser.rotation_degrees.x = 90.0
+		telegraph_laser.position = Vector3(0, 0.45, 9.0)
 
-	var l_mat = StandardMaterial3D.new()
-	l_mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-	l_mat.albedo_color = Color(1.0, 0.15, 0.1, 0.65)
-	l_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	telegraph_laser.material_override = l_mat
-	telegraph_laser.visible = false
-	add_child(telegraph_laser)
+		var l_mat = StandardMaterial3D.new()
+		l_mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+		l_mat.albedo_color = Color(1.0, 0.15, 0.1, 0.75)
+		l_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		telegraph_laser.material_override = l_mat
+		telegraph_laser.visible = false
+		add_child(telegraph_laser)
 
-	# Collision Shape matching soldier height
+	elif enemy_type == EnemyType.SHIELDER:
+		# Heavy Ballistic Riot Shield in front of soldier
+		shield_mesh = MeshInstance3D.new()
+		var s_box = BoxMesh.new()
+		s_box.size = Vector3(1.10, 1.30, 0.12)
+		shield_mesh.mesh = s_box
+		shield_mesh.position = Vector3(0, 0.65, 0.35)
+
+		var s_mat = StandardMaterial3D.new()
+		s_mat.albedo_color = Color(0.20, 0.12, 0.12) # Heavy dark composite plate
+		s_mat.metallic = 0.70
+		s_mat.roughness = 0.40
+		shield_mesh.material_override = s_mat
+		add_child(shield_mesh)
+
+		# Shield viewport slit
+		var slit = MeshInstance3D.new()
+		var slit_box = BoxMesh.new()
+		slit_box.size = Vector3(0.50, 0.08, 0.14)
+		slit.mesh = slit_box
+		slit.position = Vector3(0, 0.95, 0.36)
+		var slit_mat = StandardMaterial3D.new()
+		slit_mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+		slit_mat.albedo_color = Color(1.0, 0.45, 0.0) # Amber sensor visor
+		slit.material_override = slit_mat
+		add_child(slit)
+
+	# Collision Shape
 	var col = CollisionShape3D.new()
-	var shape = CapsuleShape3D.new()
-	shape.radius = 0.38
-	shape.height = 1.10
-	col.shape = shape
-	col.position.y = 0.55
+	if enemy_type == EnemyType.SHIELDER:
+		var b_shape = BoxShape3D.new()
+		b_shape.size = Vector3(1.15, 1.40, 0.8)
+		col.shape = b_shape
+		col.position.y = 0.70
+	else:
+		var shape = CapsuleShape3D.new()
+		shape.radius = 0.38
+		shape.height = 1.10
+		col.shape = shape
+		col.position.y = 0.55
 	add_child(col)
 
 func _create_hp_label() -> void:
-	# Background Pill Mesh for contrast
 	hp_bg = MeshInstance3D.new()
 	var quad = QuadMesh.new()
 	quad.size = Vector2(0.85, 0.42)
 	hp_bg.mesh = quad
-	hp_bg.position = Vector3(0, 1.50, 0)
+	hp_bg.position = Vector3(0, 1.55, 0)
 
 	var mat_bg = StandardMaterial3D.new()
 	mat_bg.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
@@ -113,7 +201,7 @@ func _create_hp_label() -> void:
 	add_child(hp_bg)
 
 	hp_label = Label3D.new()
-	hp_label.position = Vector3(0, 1.50, 0.02)
+	hp_label.position = Vector3(0, 1.55, 0.02)
 	hp_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	hp_label.modulate = Color(1.0, 0.35, 0.35)
 	hp_label.outline_modulate = Color(0, 0, 0, 1)
@@ -148,9 +236,11 @@ func _physics_process(delta: float) -> void:
 	if moves_forward and is_active:
 		position.z += move_speed * delta
 		if soldier_model:
-			soldier_model.animate_motion(delta, 0.75)
+			var anim_spd = 1.6 if enemy_type == EnemyType.RUNNER else 0.75
+			soldier_model.animate_motion(delta, anim_spd)
 
-	_process_shooting(delta)
+	if enemy_type == EnemyType.SHOOTER:
+		_process_shooting(delta)
 
 func _process_shooting(delta: float) -> void:
 	var p_nodes = get_tree().get_nodes_in_group("player")
@@ -204,8 +294,11 @@ func _fire_shot(player: PlayerSquad) -> void:
 		soldier_model.trigger_recoil()
 
 	var spawn_pos = soldier_model.get_muzzle_global_position() if soldier_model else global_position
-	var target_pos = player.global_position + Vector3(0, 0.8, 0)
-	var shoot_dir = (target_pos - spawn_pos).normalized()
+	# Shoot straight down the lane along the laser
+	var shoot_dir = Vector3(0, 0, 1)
+	if is_instance_valid(player):
+		var target_pos = player.global_position + Vector3(0, 0.8, 0)
+		shoot_dir = (target_pos - spawn_pos).normalized()
 
 	enemy_shot_fired.emit(spawn_pos, shoot_dir, 1.0)
 

@@ -116,8 +116,11 @@ func _physics_process(delta: float) -> void:
 	if is_defeated:
 		return
 
-	# Horizontal steer
+	# Horizontal steer & banking tilt calculation
+	var steer_bank: float = 0.0
 	if can_move:
+		var steer_vel = (target_x - position.x) * horizontal_speed
+		steer_bank = clampf(steer_vel * 0.018, -0.26, 0.26)
 		position.x = lerpf(position.x, target_x, delta * horizontal_speed)
 
 	# Forward movement
@@ -135,14 +138,20 @@ func _physics_process(delta: float) -> void:
 
 	# Cap active bullet physics emitters to 10 (front rows) to preserve smooth 60 FPS on mobile
 	var max_active_shooters = mini(10, total_members)
-	var dmg_scale = float(total_members) / float(max_active_shooters) if max_active_shooters > 0 else 1.0
+	# Diminishing returns crowd firepower:
+	# Front rows (1-10) fire directly with 100% individual potency.
+	# Rear ranks (11-60) provide support fire with natural crowd falloff.
+	var effective_firepower = float(max_active_shooters)
+	if total_members > max_active_shooters:
+		effective_firepower += pow(float(total_members - max_active_shooters), 0.62) * 1.05
+	var dmg_scale = (effective_firepower / float(max_active_shooters)) if max_active_shooters > 0 else 1.0
 
 	for i in range(total_members):
 		var m = members[i]
 		if is_instance_valid(m):
 			var is_shooter = (i < max_active_shooters)
 			var articulate = (i < 10)
-			m.update_member(delta, can_shoot and not is_defeated and is_shooter, wdata, dmg_m * dmg_scale, fire_m, articulate)
+			m.update_member(delta, can_shoot and not is_defeated and is_shooter, wdata, dmg_m * dmg_scale, fire_m, articulate, steer_bank)
 
 func set_squad_size(new_count: int) -> void:
 	if is_defeated:
@@ -226,21 +235,22 @@ func _pulse_badge(flash_color: Color) -> void:
 		tween.parallel().tween_property(badge_bg.material_override, "albedo_color", Color(0.06, 0.32, 0.88, 0.90), 0.22)
 
 func _flash_members_red() -> void:
-	for m in members:
-		if is_instance_valid(m) and is_instance_valid(m.body_mesh) and m.body_mesh.material_override:
-			var mat = m.body_mesh.material_override as StandardMaterial3D
-			mat.albedo_color = Color(1.0, 0.3, 0.3)
-			var tw = create_tween()
-			tw.tween_property(mat, "albedo_color", Color(0.12, 0.45, 0.95), 0.2)
+	if StylizedSoldier.mat_vertex_lit:
+		StylizedSoldier.mat_vertex_lit.albedo_color = Color(1.0, 0.35, 0.35)
+		var tw = create_tween()
+		tw.tween_property(StylizedSoldier.mat_vertex_lit, "albedo_color", Color.WHITE, 0.2)
 
 func _rebuild_formation() -> void:
+	var t0 = Time.get_ticks_usec()
 	var positions = _calculate_formation_offsets(squad_count)
 
 	while members.size() < squad_count:
+		var idx = members.size()
 		var m = SquadMember.new()
 		add_child(m)
 		m.shot_fired.connect(_on_member_shot_fired)
 		m.position = Vector3(randf_range(-0.5, 0.5), 0, randf_range(-0.5, 0.5))
+		m.setup_member(idx, idx < 10)
 		m.play_spawn_anim()
 		members.append(m)
 
@@ -252,6 +262,12 @@ func _rebuild_formation() -> void:
 	for i in range(members.size()):
 		if i < positions.size() and is_instance_valid(members[i]):
 			members[i].set_target_offset(positions[i])
+			# Dynamically promote rear member to articulated front row if casualties occurred
+			if i < 10 and not members[i].is_front_row:
+				members[i].setup_member(i, true)
+
+	var dt_ms = (Time.get_ticks_usec() - t0) * 0.001
+	print("[SPAWN_LATENCY] Squad count %d: rebuild took %.2f ms" % [squad_count, dt_ms])
 
 func _calculate_formation_offsets(count: int) -> Array[Vector3]:
 	var offsets: Array[Vector3] = []

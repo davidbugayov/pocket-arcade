@@ -6,6 +6,8 @@ enum Team { ALLY, ENEMY }
 
 @export var team: Team = Team.ALLY
 @export var is_enemy: bool = false
+@export var variant: int = 0
+@export var is_lod: bool = false
 
 var torso_node: Node3D
 var head_node: Node3D
@@ -16,409 +18,687 @@ var right_arm: Node3D
 var left_leg: Node3D
 var right_leg: Node3D
 var weapon_mount: Node3D
-var weapon_instance: Node3D
+var weapon_mesh_instance: MeshInstance3D
 var muzzle_point: Node3D
 var muzzle_flash: MeshInstance3D
-var rotary_cluster: Node3D
+var lod_mesh_instance: MeshInstance3D
 
 var walk_time: float = 0.0
 var recoil_offset: float = 0.0
 var flash_timer: float = 0.0
-var current_weapon_id: int = -1
+var current_weapon_id: int = 0
+var current_tilt: float = 0.0
 
-# Shared materials for batching / high performance
-static var mat_ally_body: StandardMaterial3D
-static var mat_ally_armor: StandardMaterial3D
-static var mat_ally_visor: StandardMaterial3D
+# -------------------------------------------------------------------------
+# Shared Materials Cache (Vertex-colored PBR shaders for 100% zero-state batching)
+# -------------------------------------------------------------------------
+static var mat_vertex_lit: StandardMaterial3D = null
+static var mat_ally_visor: StandardMaterial3D = null
+static var mat_enemy_visor: StandardMaterial3D = null
+static var mat_flash: StandardMaterial3D = null
 
-static var mat_enemy_body: StandardMaterial3D
-static var mat_enemy_armor: StandardMaterial3D
-static var mat_enemy_visor: StandardMaterial3D
+# Backward compatibility references
+static var mat_ally_uniforms: Array[StandardMaterial3D] = []
+static var mat_ally_armors: Array[StandardMaterial3D] = []
+static var mat_enemy_uniforms: Array[StandardMaterial3D] = []
+static var mat_enemy_armors: Array[StandardMaterial3D] = []
+static var mat_dark_metal: StandardMaterial3D = null
+static var mat_skin: StandardMaterial3D = null
 
-static var mat_dark_metal: StandardMaterial3D
-static var mat_skin: StandardMaterial3D
-static var mat_flash: StandardMaterial3D
+# -------------------------------------------------------------------------
+# Shared Procedural Meshes Cache (Built once via SurfaceTool with vertex colors)
+# -------------------------------------------------------------------------
+static var mesh_cache_body: Dictionary = {}
+static var mesh_cache_visor: Dictionary = {}
+static var mesh_cache_leg: Dictionary = {}
+static var mesh_cache_weapon: Dictionary = {}
+static var mesh_cache_lod: Dictionary = {}
+static var materials_initialized: bool = false
 
-# Preloaded Polyfork weapon scenes
-static var weapon_scenes = {
-	0: load("res://assets/models/rifle.glb"),
-	1: load("res://assets/models/scattergun.glb"),
-	2: load("res://assets/models/rotary_cannon.glb")
-}
+# Color Palette Constants
+# Ally: Dark graphite fatigue, vibrant cobalt blue armor, rounded navy helmet, luminous cyan visor, khaki gear
+const COL_AL_FATIGUE = Color(0.12, 0.14, 0.18)
+const COL_AL_ARMOR   = Color(0.12, 0.48, 0.94)
+const COL_AL_HELMET  = Color(0.18, 0.32, 0.58)
+const COL_AL_BRIM    = Color(0.08, 0.10, 0.14)
+const COL_AL_VISOR   = Color(0.10, 0.95, 1.00)
+const COL_AL_GEAR    = Color(0.38, 0.32, 0.24)
+const COL_AL_PACK    = Color(0.16, 0.22, 0.32)
+const COL_AL_BOOTS   = Color(0.10, 0.10, 0.12)
+
+# Enemy: Dark charcoal fatigue, crimson red armor, dark maroon helmet, glowing amber visor, dark leather gear
+const COL_EN_FATIGUE = Color(0.14, 0.11, 0.11)
+const COL_EN_ARMOR   = Color(0.86, 0.14, 0.14)
+const COL_EN_HELMET  = Color(0.42, 0.12, 0.14)
+const COL_EN_BRIM    = Color(0.10, 0.08, 0.08)
+const COL_EN_VISOR   = Color(1.00, 0.42, 0.04)
+const COL_EN_GEAR    = Color(0.24, 0.18, 0.15)
+const COL_EN_PACK    = Color(0.22, 0.12, 0.12)
+const COL_EN_BOOTS   = Color(0.08, 0.08, 0.08)
+
+# Weapons: Gunmetal receiver, steel barrel, dark grip
+const COL_GUN_RECEIVER = Color(0.18, 0.20, 0.24)
+const COL_GUN_BARREL   = Color(0.32, 0.34, 0.38)
+const COL_GUN_MAGAZINE = Color(0.12, 0.13, 0.16)
 
 func _init() -> void:
 	_init_materials()
-	_build_character_hierarchy()
+	_init_mesh_cache()
+
+func _ready() -> void:
+	if torso_node == null and lod_mesh_instance == null:
+		build_soldier(not is_lod, variant)
+	equip_weapon(current_weapon_id)
 
 static func _init_materials() -> void:
-	if mat_ally_body != null:
+	if materials_initialized:
 		return
+	materials_initialized = true
 
-	# Ally Palette (High-readability tactical navy / vibrant royal blue & cyan)
-	mat_ally_body = StandardMaterial3D.new()
-	mat_ally_body.albedo_color = Color(0.12, 0.28, 0.65) # Navy uniform
-	mat_ally_body.roughness = 0.65
+	# Unified Master Material: uses vertex colors baked into the geometry!
+	# This single material renders dark uniform, bright armor, helmet, gear, and weapon in 1 draw call!
+	mat_vertex_lit = StandardMaterial3D.new()
+	mat_vertex_lit.vertex_color_use_as_albedo = true
+	mat_vertex_lit.roughness = 0.55
+	mat_vertex_lit.metallic = 0.15
 
-	mat_ally_armor = StandardMaterial3D.new()
-	mat_ally_armor.albedo_color = Color(0.18, 0.52, 0.98) # Bold cobalt armor & helmet
-	mat_ally_armor.roughness = 0.35
-	mat_ally_armor.metallic = 0.15
-
+	# Visor materials for front-row glow
 	mat_ally_visor = StandardMaterial3D.new()
 	mat_ally_visor.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-	mat_ally_visor.albedo_color = Color(0.25, 0.95, 1.0) # Glowing cyan visor
-
-	# Enemy Palette (Aggressive crimson / charcoal & amber)
-	mat_enemy_body = StandardMaterial3D.new()
-	mat_enemy_body.albedo_color = Color(0.24, 0.18, 0.20) # Charcoal battle uniform
-	mat_enemy_body.roughness = 0.70
-
-	mat_enemy_armor = StandardMaterial3D.new()
-	mat_enemy_armor.albedo_color = Color(0.88, 0.14, 0.14) # Crimson armor & helmet
-	mat_enemy_armor.roughness = 0.35
-	mat_enemy_armor.metallic = 0.20
+	mat_ally_visor.albedo_color = COL_AL_VISOR
 
 	mat_enemy_visor = StandardMaterial3D.new()
 	mat_enemy_visor.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-	mat_enemy_visor.albedo_color = Color(1.0, 0.32, 0.10) # Glowing amber-orange visor
+	mat_enemy_visor.albedo_color = COL_EN_VISOR
 
-	# General Details
-	mat_dark_metal = StandardMaterial3D.new()
-	mat_dark_metal.albedo_color = Color(0.18, 0.18, 0.22)
-	mat_dark_metal.metallic = 0.8
-	mat_dark_metal.roughness = 0.35
-
-	mat_skin = StandardMaterial3D.new()
-	mat_skin.albedo_color = Color(0.82, 0.64, 0.52)
-	mat_skin.roughness = 0.8
-
+	# Muzzle flash
 	mat_flash = StandardMaterial3D.new()
 	mat_flash.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-	mat_flash.albedo_color = Color(1.0, 0.95, 0.5)
+	mat_flash.albedo_color = Color(1.0, 0.95, 0.45)
 
-func _ready() -> void:
-	if torso_node == null:
-		_build_character_hierarchy()
-	if weapon_instance == null:
-		equip_weapon(0)
+	# Compatibility fallbacks
+	mat_dark_metal = StandardMaterial3D.new()
+	mat_dark_metal.albedo_color = COL_GUN_RECEIVER
+	mat_dark_metal.metallic = 0.85
+	mat_dark_metal.roughness = 0.30
 
+	mat_skin = StandardMaterial3D.new()
+	mat_skin.albedo_color = Color(0.86, 0.68, 0.56)
+
+	for i in range(3):
+		var m_al = StandardMaterial3D.new()
+		m_al.albedo_color = COL_AL_ARMOR
+		mat_ally_armors.append(m_al)
+		mat_ally_uniforms.append(m_al)
+
+		var m_en = StandardMaterial3D.new()
+		m_en.albedo_color = COL_EN_ARMOR
+		mat_enemy_armors.append(m_en)
+		mat_enemy_uniforms.append(m_en)
+
+static func _init_mesh_cache() -> void:
+	if not mesh_cache_weapon.is_empty():
+		return
+
+	# Pre-build unified weapon models (single draw call per weapon with vertex colors)
+	for wid in [0, 1, 2]:
+		mesh_cache_weapon[wid] = _generate_weapon_mesh(wid)
+
+	# Pre-build legs
+	for is_en in [false, true]:
+		var leg_key = "en" if is_en else "al"
+		mesh_cache_leg[leg_key] = _generate_leg_mesh(is_en)
+	# Compatibility key
+	mesh_cache_leg[true] = mesh_cache_leg["en"]
+	mesh_cache_leg[false] = mesh_cache_leg["al"]
+
+	# Pre-build bodies, visors, and LOD models for each team & variant
+	for is_en in [false, true]:
+		for v in range(3):
+			var key = "%s_%d" % ["en" if is_en else "al", v]
+			mesh_cache_body[key] = _generate_upper_body_mesh(v, is_en)
+			mesh_cache_visor[key] = _generate_visor_mesh(v, is_en)
+
+			# Pre-build LOD single-mesh soldiers (body + legs + weapon all in 1 mesh with vertex colors)
+			for wid in [0, 1, 2]:
+				var lod_key = "%s_%d_w%d" % ["en" if is_en else "al", v, wid]
+				mesh_cache_lod[lod_key] = _generate_lod_mesh(v, wid, is_en)
+
+# -------------------------------------------------------------------------
+# SurfaceTool Vertex Color Helper Functions
+# -------------------------------------------------------------------------
+static func _append_colored_primitive(st: SurfaceTool, prim: PrimitiveMesh, xform: Transform3D, col: Color) -> void:
+	var arrays = prim.get_mesh_arrays()
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+
+	if indices.size() > 0:
+		for idx in indices:
+			st.set_color(col)
+			if normals.size() > idx:
+				st.set_normal((xform.basis * normals[idx]).normalized())
+			st.add_vertex(xform * verts[idx])
+	else:
+		for i in range(verts.size()):
+			st.set_color(col)
+			if normals.size() > i:
+				st.set_normal((xform.basis * normals[i]).normalized())
+			st.add_vertex(xform * verts[i])
+
+static func _append_mesh_with_vertex_colors(st: SurfaceTool, mesh: ArrayMesh, xform: Transform3D, default_col: Color = Color.WHITE) -> void:
+	if mesh == null or mesh.get_surface_count() == 0:
+		return
+	var arrays = mesh.surface_get_arrays(0)
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL] if arrays.size() > Mesh.ARRAY_NORMAL and arrays[Mesh.ARRAY_NORMAL] != null else PackedVector3Array()
+	var colors: PackedColorArray = arrays[Mesh.ARRAY_COLOR] if arrays.size() > Mesh.ARRAY_COLOR and arrays[Mesh.ARRAY_COLOR] != null else PackedColorArray()
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays.size() > Mesh.ARRAY_INDEX and arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+
+	var has_colors = colors.size() == verts.size()
+	if indices.size() > 0:
+		for idx in indices:
+			st.set_color(colors[idx] if has_colors else default_col)
+			if normals.size() > idx:
+				st.set_normal((xform.basis * normals[idx]).normalized())
+			st.add_vertex(xform * verts[idx])
+	else:
+		for i in range(verts.size()):
+			st.set_color(colors[i] if has_colors else default_col)
+			if normals.size() > i:
+				st.set_normal((xform.basis * normals[i]).normalized())
+			st.add_vertex(xform * verts[i])
+
+# -------------------------------------------------------------------------
+# Low-Poly Mobile Procedural Mesh Generators
+# -------------------------------------------------------------------------
+static func _make_sphere(radius: float, height: float, rad_segs: int = 10, rings: int = 5) -> SphereMesh:
+	var m = SphereMesh.new()
+	m.radius = radius
+	m.height = height
+	m.radial_segments = rad_segs
+	m.rings = rings
+	return m
+
+static func _make_capsule(radius: float, height: float, rad_segs: int = 10, rings: int = 4) -> CapsuleMesh:
+	var m = CapsuleMesh.new()
+	m.radius = radius
+	m.height = height
+	m.radial_segments = rad_segs
+	m.rings = rings
+	return m
+
+static func _make_cylinder(top_r: float, bot_r: float, height: float, rad_segs: int = 8) -> CylinderMesh:
+	var m = CylinderMesh.new()
+	m.top_radius = top_r
+	m.bottom_radius = bot_r
+	m.height = height
+	m.radial_segments = rad_segs
+	m.rings = 1
+	return m
+
+static func _generate_upper_body_mesh(v: int, is_en: bool = false) -> ArrayMesh:
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var c_fatigue = COL_EN_FATIGUE if is_en else COL_AL_FATIGUE
+	var c_armor   = COL_EN_ARMOR if is_en else COL_AL_ARMOR
+	var c_helmet  = COL_EN_HELMET if is_en else COL_AL_HELMET
+	var c_brim    = COL_EN_BRIM if is_en else COL_AL_BRIM
+	var c_visor   = COL_EN_VISOR if is_en else COL_AL_VISOR
+	var c_gear    = COL_EN_GEAR if is_en else COL_AL_GEAR
+	var c_pack    = COL_EN_PACK if is_en else COL_AL_PACK
+
+	# 1. Torso Undersuit / Fatigue: Dark tactical undersuit
+	var torso_cap = _make_capsule(0.16, 0.44, 10, 4)
+	_append_colored_primitive(st, torso_cap, Transform3D(Basis(), Vector3(0, 0.0, 0)), c_fatigue)
+
+	# 2. Chest Armor Plate Carrier: Bright vibrant team armor
+	var chest_plate = _make_capsule(0.175, 0.32, 10, 4)
+	_append_colored_primitive(st, chest_plate, Transform3D(Basis(), Vector3(0, 0.04, 0.02)), c_armor)
+
+	# 3. Tactical Belt with webbing
+	var belt = _make_cylinder(0.175, 0.175, 0.08, 8)
+	_append_colored_primitive(st, belt, Transform3D(Basis(), Vector3(0, -0.16, 0)), c_gear)
+
+	# Belt buckle / center clasp
+	var buckle = BoxMesh.new()
+	buckle.size = Vector3(0.08, 0.07, 0.04)
+	_append_colored_primitive(st, buckle, Transform3D(Basis(), Vector3(0, -0.16, 0.17)), COL_GUN_BARREL)
+
+	# 4. Shoulders (Pauldrons): Armor color with distinct silhouette
+	for side in [-1, 1]:
+		var sh_sph = _make_sphere(0.09, 0.14, 8, 4)
+		_append_colored_primitive(st, sh_sph, Transform3D(Basis(), Vector3(side * 0.21, 0.15, 0)), c_armor)
+
+	# 5. Head base / Balaclava: Dark tactical fabric
+	var head_sph = _make_sphere(0.13, 0.24, 10, 5)
+	_append_colored_primitive(st, head_sph, Transform3D(Basis(), Vector3(0, 0.27, 0)), c_fatigue)
+
+	# 6. Large Stylized Combat Helmet: Rounded dome clearly visible from top-down camera
+	var helm_sph = _make_sphere(0.23, 0.30, 12, 6)
+	_append_colored_primitive(st, helm_sph, Transform3D(Basis(), Vector3(0, 0.30, 0)), c_helmet)
+
+	# Flared Helmet Visor Brow / Rim: Dark contrasting rim
+	var brim = BoxMesh.new()
+	brim.size = Vector3(0.30, 0.04, 0.12)
+	_append_colored_primitive(st, brim, Transform3D(Basis(), Vector3(0, 0.28, 0.16)), c_brim)
+
+	# Visor band embedded in helmet for rear LOD readability
+	var visor_bar = BoxMesh.new()
+	visor_bar.size = Vector3(0.26, 0.07, 0.06)
+	_append_colored_primitive(st, visor_bar, Transform3D(Basis(), Vector3(0, 0.28, 0.18)), c_visor)
+
+	# Flared Ear Guards
+	for side in [-1, 1]:
+		var ear_pad = BoxMesh.new()
+		ear_pad.size = Vector3(0.06, 0.12, 0.14)
+		_append_colored_primitive(st, ear_pad, Transform3D(Basis(), Vector3(side * 0.22, 0.24, 0)), c_helmet)
+
+	# 7. Coherent Silhouette Variations (Instantly distinguishable from behind and camera!)
+	match v:
+		0: # Variant 0: Regular Rifleman — Sleek tactical harness, combat knife on left shoulder, rear utility pouch
+			# Left shoulder combat knife sheath
+			var knife = BoxMesh.new()
+			knife.size = Vector3(0.04, 0.14, 0.05)
+			_append_colored_primitive(st, knife, Transform3D(Basis(Vector3(0, 0, 1), deg_to_rad(-15)), Vector3(-0.16, 0.18, 0.12)), COL_GUN_RECEIVER)
+
+			# Rear waist utility pouches (visible from behind!)
+			for p_off in [-0.07, 0.07]:
+				var pouch = BoxMesh.new()
+				pouch.size = Vector3(0.08, 0.08, 0.06)
+				_append_colored_primitive(st, pouch, Transform3D(Basis(), Vector3(p_off, -0.14, -0.17)), c_gear)
+
+		1: # Variant 1: Heavy Trooper — Wide reinforced shoulder pauldrons & heavy neck gorget collar
+			# Reinforced heavy neck gorget collar (visible in front and side)
+			var gorget = BoxMesh.new()
+			gorget.size = Vector3(0.30, 0.08, 0.24)
+			_append_colored_primitive(st, gorget, Transform3D(Basis(), Vector3(0, 0.18, 0.02)), c_armor)
+
+			# Broad heavy shoulder armor plates (clearly widens shoulders from behind!)
+			for side in [-1, 1]:
+				var h_plate = BoxMesh.new()
+				h_plate.size = Vector3(0.14, 0.08, 0.20)
+				_append_colored_primitive(st, h_plate, Transform3D(Basis(Vector3(0, 0, 1), deg_to_rad(side * -15)), Vector3(side * 0.25, 0.16, 0.01)), c_armor)
+
+			# Heavy chest magazine pouches
+			for side in [-0.07, 0.07]:
+				var mag = BoxMesh.new()
+				mag.size = Vector3(0.06, 0.11, 0.05)
+				_append_colored_primitive(st, mag, Transform3D(Basis(), Vector3(side, 0.01, 0.18)), c_gear)
+
+		2: # Variant 2: Specialist — Compact tactical backpack with radio antenna mast (prominent from behind!)
+			# Rear communication survival backpack
+			var pack = BoxMesh.new()
+			pack.size = Vector3(0.24, 0.26, 0.12)
+			_append_colored_primitive(st, pack, Transform3D(Basis(), Vector3(0, 0.04, -0.18)), c_pack)
+
+			# Backpack straps over shoulders
+			for side in [-0.11, 0.11]:
+				var strap = BoxMesh.new()
+				strap.size = Vector3(0.04, 0.28, 0.02)
+				_append_colored_primitive(st, strap, Transform3D(Basis(), Vector3(side, 0.08, -0.01)), c_gear)
+
+			# Slender tactical radio antenna mast extending up from backpack
+			var antenna = _make_cylinder(0.012, 0.018, 0.44, 6)
+			_append_colored_primitive(st, antenna, Transform3D(Basis(), Vector3(-0.09, 0.38, -0.22)), COL_GUN_BARREL)
+
+	return st.commit()
+
+static func _generate_visor_mesh(v: int, is_en: bool = false) -> ArrayMesh:
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var c_visor = COL_EN_VISOR if is_en else COL_AL_VISOR
+	# Glowing panoramic tactical visor band across helmet brow
+	var visor_bar = BoxMesh.new()
+	visor_bar.size = Vector3(0.26, 0.07, 0.06)
+	_append_colored_primitive(st, visor_bar, Transform3D(Basis(), Vector3(0, 0.28, 0.18)), c_visor)
+	return st.commit()
+
+static func _generate_leg_mesh(is_en: bool = false) -> ArrayMesh:
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	var c_fatigue = COL_EN_FATIGUE if is_en else COL_AL_FATIGUE
+	var c_boots   = COL_EN_BOOTS if is_en else COL_AL_BOOTS
+
+	# Tapered fatigue leg capsule
+	var leg_cap = _make_capsule(0.07, 0.28, 8, 3)
+	_append_colored_primitive(st, leg_cap, Transform3D(Basis(), Vector3(0, -0.12, 0)), c_fatigue)
+
+	# Tactical combat boot with sole
+	var boot = _make_capsule(0.075, 0.18, 8, 3)
+	var b_xform = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(90)), Vector3(0, -0.22, 0.03))
+	_append_colored_primitive(st, boot, b_xform, c_boots)
+
+	return st.commit()
+
+static func _generate_weapon_mesh(wid: int) -> ArrayMesh:
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	match wid:
+		0: # Assault Rifle (Precision dark weapon with steel barrel)
+			var rec = BoxMesh.new()
+			rec.size = Vector3(0.08, 0.11, 0.32)
+			_append_colored_primitive(st, rec, Transform3D(Basis(), Vector3(0, 0, 0)), COL_GUN_RECEIVER)
+
+			var b = _make_cylinder(0.025, 0.025, 0.32, 8)
+			var b_rot = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(90)), Vector3(0, 0.02, 0.28))
+			_append_colored_primitive(st, b, b_rot, COL_GUN_BARREL)
+
+			var mag = BoxMesh.new()
+			mag.size = Vector3(0.05, 0.15, 0.09)
+			_append_colored_primitive(st, mag, Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(15)), Vector3(0, -0.10, 0.06)), COL_GUN_MAGAZINE)
+
+			var stock = BoxMesh.new()
+			stock.size = Vector3(0.06, 0.09, 0.18)
+			_append_colored_primitive(st, stock, Transform3D(Basis(), Vector3(0, -0.02, -0.22)), COL_GUN_RECEIVER)
+
+		1: # Combat Shotgun (Heavy dual-barrel receiver & wide pump)
+			var s_rec = BoxMesh.new()
+			s_rec.size = Vector3(0.10, 0.13, 0.34)
+			_append_colored_primitive(st, s_rec, Transform3D(Basis(), Vector3(0, 0, 0)), COL_GUN_RECEIVER)
+
+			var s_b = _make_cylinder(0.045, 0.045, 0.34, 8)
+			var sb_rot = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(90)), Vector3(0, 0.02, 0.28))
+			_append_colored_primitive(st, s_b, sb_rot, COL_GUN_BARREL)
+
+			var pump = _make_cylinder(0.055, 0.055, 0.16, 8)
+			_append_colored_primitive(st, pump, Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(90)), Vector3(0, -0.03, 0.18)), COL_GUN_MAGAZINE)
+
+		2: # Plasma Minigun (Rotary cylinder motor housing & 3-barrel cluster)
+			var m_body = _make_cylinder(0.09, 0.09, 0.26, 8)
+			var mb_rot = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(90)), Vector3(0, 0, 0))
+			_append_colored_primitive(st, m_body, mb_rot, COL_GUN_RECEIVER)
+
+			for a in [0.0, 120.0, 240.0]:
+				var rad = deg_to_rad(a)
+				var bx = cos(rad) * 0.055
+				var by = sin(rad) * 0.055
+				var b_cyl = _make_cylinder(0.022, 0.022, 0.42, 6)
+				var b_xform = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(90)), Vector3(bx, by, 0.28))
+				_append_colored_primitive(st, b_cyl, b_xform, COL_GUN_BARREL)
+
+	return st.commit()
+
+static func _generate_lod_mesh(v: int, wid: int, is_en: bool = false) -> ArrayMesh:
+	# Single combined mesh for entire soldier (body + legs + weapon all with baked vertex colors!)
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	# 1. Upper body (with baked uniform, armor, helmet, visor, gear colors)
+	var body_m = _generate_upper_body_mesh(v, is_en)
+	_append_mesh_with_vertex_colors(st, body_m, Transform3D(Basis(), Vector3(0, 0.42, 0)))
+
+	# 2. Left leg in forward stride
+	var l_leg = _generate_leg_mesh(is_en)
+	_append_mesh_with_vertex_colors(st, l_leg, Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(15)), Vector3(-0.11, 0.24, 0.04)))
+
+	# 3. Right leg in rear stride
+	var r_leg = _generate_leg_mesh(is_en)
+	_append_mesh_with_vertex_colors(st, r_leg, Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(-15)), Vector3(0.11, 0.24, -0.04)))
+
+	# 4. Weapon (dark gunmetal receiver & steel barrel)
+	var w_m = _generate_weapon_mesh(wid)
+	_append_mesh_with_vertex_colors(st, w_m, Transform3D(Basis(), Vector3(0.08, 0.44, 0.24)))
+
+	return st.commit()
+
+# -------------------------------------------------------------------------
+# Hierarchy & Lifecycle
+# -------------------------------------------------------------------------
 func setup_team(p_is_enemy: bool) -> void:
 	is_enemy = p_is_enemy
 	team = Team.ENEMY if is_enemy else Team.ALLY
-	_apply_team_materials()
+	rotation_degrees.y = 0.0 if is_enemy else 180.0
+	_apply_materials()
 
-	# Enemies face towards player (+Z), Allies face -Z
-	if is_enemy:
-		rotation_degrees.y = 0.0
-	else:
-		rotation_degrees.y = 180.0
+func set_variant(var_idx: int) -> void:
+	variant = var_idx % 3
+	build_soldier(not is_lod, variant)
 
-func _build_character_hierarchy() -> void:
-	if torso_node != null:
+func set_lod(p_lod: bool) -> void:
+	if is_lod == p_lod:
 		return
-	# Root offset so character feet stand at y = 0
+	is_lod = p_lod
+	build_soldier(not is_lod, variant)
+	equip_weapon(current_weapon_id)
+
+func build_soldier(articulated: bool = true, var_idx: int = 0) -> void:
+	variant = var_idx % 3
+	is_lod = not articulated
+
+	# Clear previous hierarchy
+	for child in get_children():
+		remove_child(child)
+		child.queue_free()
+
+	torso_node = null
+	head_node = null
+	left_arm = null
+	right_arm = null
+	left_leg = null
+	right_leg = null
+	weapon_mount = null
+	weapon_mesh_instance = null
+	muzzle_point = null
+	muzzle_flash = null
+	lod_mesh_instance = null
+
+	var key = "%s_%d" % ["en" if is_enemy else "al", variant]
+
+	if not articulated:
+		# STREAMLINED REAR LOD: Exactly 1 single MeshInstance3D node!
+		var lod_key = "%s_%d_w%d" % ["en" if is_enemy else "al", variant, current_weapon_id]
+		lod_mesh_instance = MeshInstance3D.new()
+		lod_mesh_instance.name = "LodSoldier"
+		lod_mesh_instance.mesh = mesh_cache_lod.get(lod_key, mesh_cache_lod.values()[0])
+		lod_mesh_instance.material_override = mat_vertex_lit
+		add_child(lod_mesh_instance)
+
+		# Muzzle point for shooting
+		muzzle_point = Node3D.new()
+		muzzle_point.position = Vector3(0.08, 0.44, 0.65)
+		add_child(muzzle_point)
+
+		# Minimal flash
+		muzzle_flash = MeshInstance3D.new()
+		muzzle_flash.mesh = _make_sphere(0.10, 0.20, 8, 4)
+		muzzle_flash.material_override = mat_flash
+		muzzle_flash.visible = false
+		muzzle_point.add_child(muzzle_flash)
+
+		# Compatibility torso node reference
+		torso_node = Node3D.new()
+		torso_node.name = "TorsoRoot"
+		add_child(torso_node)
+		_apply_materials()
+		return
+
+	# FRONT ROW ARTICULATED SOLDIER: 4 meshes total (Body, Left Leg, Right Leg, Weapon)
 	torso_node = Node3D.new()
+	torso_node.name = "TorsoRoot"
 	torso_node.position.y = 0.42
 	add_child(torso_node)
 
-	# 1. Torso & Armor
-	var torso_mesh = MeshInstance3D.new()
-	var t_box = BoxMesh.new()
-	t_box.size = Vector3(0.34, 0.38, 0.22)
-	torso_mesh.mesh = t_box
-	torso_mesh.name = "TorsoMesh"
-	torso_node.add_child(torso_mesh)
+	# 1. Combined Upper Body Mesh with baked vertex colors
+	var body_mesh = MeshInstance3D.new()
+	body_mesh.name = "TorsoMesh"
+	body_mesh.mesh = mesh_cache_body.get(key, mesh_cache_body.values()[0])
+	body_mesh.material_override = mat_vertex_lit
+	torso_node.add_child(body_mesh)
 
-	# Chest armor plate
-	var chest_plate = MeshInstance3D.new()
-	var cp_box = BoxMesh.new()
-	cp_box.size = Vector3(0.30, 0.26, 0.08)
-	chest_plate.mesh = cp_box
-	chest_plate.position = Vector3(0, 0.04, 0.10)
-	chest_plate.name = "ChestPlate"
-	torso_node.add_child(chest_plate)
-
-	# Belt & buckle
-	var belt = MeshInstance3D.new()
-	var b_box = BoxMesh.new()
-	b_box.size = Vector3(0.36, 0.08, 0.24)
-	belt.mesh = b_box
-	belt.position.y = -0.16
-	belt.material_override = mat_dark_metal
-	torso_node.add_child(belt)
-
-	# 2. Head & Helmet
-	head_node = Node3D.new()
-	head_node.position.y = 0.28
-	torso_node.add_child(head_node)
-
-	# Head base
-	var head_mesh = MeshInstance3D.new()
-	var h_sph = SphereMesh.new()
-	h_sph.radius = 0.14
-	h_sph.height = 0.28
-	head_mesh.mesh = h_sph
-	head_mesh.material_override = mat_skin
-	head_node.add_child(head_mesh)
-
-	# Helmet Dome (Tactical low-poly helmet covering top & sides)
-	helmet_mesh = MeshInstance3D.new()
-	var helm_sph = SphereMesh.new()
-	helm_sph.radius = 0.17
-	helm_sph.height = 0.26
-	helmet_mesh.mesh = helm_sph
-	helmet_mesh.position.y = 0.04
-	head_node.add_child(helmet_mesh)
-
-	# Visor (Glowing tactical eye-band)
+	# Glowing Visor Mesh Overlay (High emission neon visor)
 	visor_mesh = MeshInstance3D.new()
-	var v_box = BoxMesh.new()
-	v_box.size = Vector3(0.24, 0.06, 0.06)
-	visor_mesh.mesh = v_box
-	visor_mesh.position = Vector3(0, 0.02, 0.13)
-	head_node.add_child(visor_mesh)
+	visor_mesh.name = "VisorMesh"
+	visor_mesh.mesh = mesh_cache_visor.get(key, mesh_cache_visor.values()[0])
+	visor_mesh.material_override = mat_enemy_visor if is_enemy else mat_ally_visor
+	torso_node.add_child(visor_mesh)
 
-	# 3. Shoulder Pads & Arms
-	for side in [-1, 1]:
-		# Shoulder Pad
-		var pad = MeshInstance3D.new()
-		var p_box = BoxMesh.new()
-		p_box.size = Vector3(0.12, 0.10, 0.18)
-		pad.mesh = p_box
-		pad.position = Vector3(side * 0.22, 0.15, 0)
-		pad.name = "ShoulderPad_" + ("L" if side < 0 else "R")
-		torso_node.add_child(pad)
+	# 2. Articulated Legs
+	left_leg = Node3D.new()
+	left_leg.name = "LeftLeg"
+	left_leg.position = Vector3(-0.11, 0.24, 0.0)
+	add_child(left_leg)
 
+	var l_leg_mesh = MeshInstance3D.new()
+	l_leg_mesh.name = "LeftLegMesh"
+	var leg_key = "en" if is_enemy else "al"
+	l_leg_mesh.mesh = mesh_cache_leg.get(leg_key, mesh_cache_leg.values()[0])
+	l_leg_mesh.material_override = mat_vertex_lit
+	left_leg.add_child(l_leg_mesh)
+
+	right_leg = Node3D.new()
+	right_leg.name = "RightLeg"
+	right_leg.position = Vector3(0.11, 0.24, 0.0)
+	add_child(right_leg)
+
+	var r_leg_mesh = MeshInstance3D.new()
+	r_leg_mesh.name = "RightLegMesh"
+	r_leg_mesh.mesh = mesh_cache_leg.get(leg_key, mesh_cache_leg.values()[0])
+	r_leg_mesh.material_override = mat_vertex_lit
+	right_leg.add_child(r_leg_mesh)
+
+	# 3. Two-Handed Weapon Mount
+	weapon_mount = Node3D.new()
+	weapon_mount.name = "WeaponMount"
+	weapon_mount.position = Vector3(0.08, 0.02, 0.24)
+	torso_node.add_child(weapon_mount)
+
+	weapon_mesh_instance = MeshInstance3D.new()
+	weapon_mesh_instance.name = "WeaponMesh"
+	weapon_mesh_instance.mesh = mesh_cache_weapon.get(current_weapon_id, mesh_cache_weapon[0])
+	weapon_mesh_instance.material_override = mat_vertex_lit
+	weapon_mount.add_child(weapon_mesh_instance)
+
+	# Distinct Weapon Grip Arms
+	var arm_color = COL_EN_FATIGUE if is_enemy else COL_AL_FATIGUE
 	left_arm = Node3D.new()
-	left_arm.position = Vector3(-0.20, 0.12, 0.0)
+	left_arm.position = Vector3(-0.21, 0.12, 0.0)
 	torso_node.add_child(left_arm)
 
+	var l_arm_cap = _make_capsule(0.055, 0.26, 8, 3)
 	var l_arm_mesh = MeshInstance3D.new()
-	var l_cyl = CylinderMesh.new()
-	l_cyl.top_radius = 0.06
-	l_cyl.bottom_radius = 0.05
-	l_cyl.height = 0.28
-	l_arm_mesh.mesh = l_cyl
-	l_arm_mesh.rotation_degrees.x = -45.0
-	l_arm_mesh.rotation_degrees.y = 20.0
-	l_arm_mesh.position = Vector3(0.04, -0.06, 0.12)
-	l_arm_mesh.name = "LeftArmMesh"
+	l_arm_mesh.mesh = l_arm_cap
+	l_arm_mesh.material_override = mat_vertex_lit
+	l_arm_mesh.rotation_degrees = Vector3(-45, 25, 0)
+	l_arm_mesh.position = Vector3(0.08, -0.06, 0.12)
 	left_arm.add_child(l_arm_mesh)
 
 	right_arm = Node3D.new()
-	right_arm.position = Vector3(0.20, 0.12, 0.0)
+	right_arm.position = Vector3(0.21, 0.12, 0.0)
 	torso_node.add_child(right_arm)
 
 	var r_arm_mesh = MeshInstance3D.new()
-	var r_cyl = CylinderMesh.new()
-	r_cyl.top_radius = 0.06
-	r_cyl.bottom_radius = 0.05
-	r_cyl.height = 0.28
-	r_arm_mesh.mesh = r_cyl
-	r_arm_mesh.rotation_degrees.x = -60.0
-	r_arm_mesh.rotation_degrees.y = -15.0
-	r_arm_mesh.position = Vector3(-0.04, -0.04, 0.10)
-	r_arm_mesh.name = "RightArmMesh"
+	r_arm_mesh.mesh = l_arm_cap
+	r_arm_mesh.material_override = mat_vertex_lit
+	r_arm_mesh.rotation_degrees = Vector3(-60, -18, 0)
+	r_arm_mesh.position = Vector3(-0.06, -0.04, 0.10)
 	right_arm.add_child(r_arm_mesh)
 
-	# 4. Weapon Mount (Pivots at chest level aiming forward)
-	weapon_mount = Node3D.new()
-	weapon_mount.position = Vector3(0.10, 0.04, 0.22)
-	torso_node.add_child(weapon_mount)
-
+	# Muzzle Flash & Emitter Point
 	muzzle_point = Node3D.new()
-	muzzle_point.position = Vector3(0, 0.05, 0.45)
+	muzzle_point.position = Vector3(0, 0.04, 0.42)
 	weapon_mount.add_child(muzzle_point)
 
-	# Muzzle Flash Mesh
 	muzzle_flash = MeshInstance3D.new()
-	var mf_mesh = SphereMesh.new()
-	mf_mesh.radius = 0.12
-	mf_mesh.height = 0.24
-	muzzle_flash.mesh = mf_mesh
+	muzzle_flash.mesh = _make_sphere(0.11, 0.22, 8, 4)
 	muzzle_flash.material_override = mat_flash
 	muzzle_flash.visible = false
 	muzzle_point.add_child(muzzle_flash)
 
-	# 5. Articulated Legs
-	left_leg = Node3D.new()
-	left_leg.position = Vector3(-0.10, 0.24, 0.0)
-	add_child(left_leg)
+	_apply_materials()
 
-	var l_leg_mesh = MeshInstance3D.new()
-	var ll_box = BoxMesh.new()
-	ll_box.size = Vector3(0.12, 0.26, 0.13)
-	l_leg_mesh.mesh = ll_box
-	l_leg_mesh.position.y = -0.13
-	l_leg_mesh.name = "LeftLegMesh"
-	left_leg.add_child(l_leg_mesh)
-
-	var l_boot = MeshInstance3D.new()
-	var lb_box = BoxMesh.new()
-	lb_box.size = Vector3(0.13, 0.10, 0.18)
-	l_boot.mesh = lb_box
-	l_boot.position = Vector3(0, -0.22, 0.03)
-	l_boot.material_override = mat_dark_metal
-	left_leg.add_child(l_boot)
-
-	right_leg = Node3D.new()
-	right_leg.position = Vector3(0.10, 0.24, 0.0)
-	add_child(right_leg)
-
-	var r_leg_mesh = MeshInstance3D.new()
-	var rl_box = BoxMesh.new()
-	rl_box.size = Vector3(0.12, 0.26, 0.13)
-	r_leg_mesh.mesh = rl_box
-	r_leg_mesh.position.y = -0.13
-	r_leg_mesh.name = "RightLegMesh"
-	right_leg.add_child(r_leg_mesh)
-
-	var r_boot = MeshInstance3D.new()
-	var rb_box = BoxMesh.new()
-	rb_box.size = Vector3(0.13, 0.10, 0.18)
-	r_boot.mesh = rb_box
-	r_boot.position = Vector3(0, -0.22, 0.03)
-	r_boot.material_override = mat_dark_metal
-	right_leg.add_child(r_boot)
-
-	_apply_team_materials()
-
-func _apply_team_materials() -> void:
-	var b_mat = mat_enemy_body if is_enemy else mat_ally_body
-	var a_mat = mat_enemy_armor if is_enemy else mat_ally_armor
-	var v_mat = mat_enemy_visor if is_enemy else mat_ally_visor
-
-	if helmet_mesh:
-		helmet_mesh.material_override = a_mat
-	if visor_mesh:
-		visor_mesh.material_override = v_mat
-
-	var torso_m = torso_node.get_node_or_null("TorsoMesh") as MeshInstance3D
-	if torso_m:
-		torso_m.material_override = b_mat
-
-	var chest_p = torso_node.get_node_or_null("ChestPlate") as MeshInstance3D
-	if chest_p:
-		chest_p.material_override = a_mat
-
-	var sp_l = torso_node.get_node_or_null("ShoulderPad_L") as MeshInstance3D
-	if sp_l:
-		sp_l.material_override = a_mat
-	var sp_r = torso_node.get_node_or_null("ShoulderPad_R") as MeshInstance3D
-	if sp_r:
-		sp_r.material_override = a_mat
-
-	var la_m = left_arm.get_node_or_null("LeftArmMesh") as MeshInstance3D
-	if la_m:
-		la_m.material_override = b_mat
-	var ra_m = right_arm.get_node_or_null("RightArmMesh") as MeshInstance3D
-	if ra_m:
-		ra_m.material_override = b_mat
-
-	var ll_m = left_leg.get_node_or_null("LeftLegMesh") as MeshInstance3D
-	if ll_m:
-		ll_m.material_override = b_mat
-	var rl_m = right_leg.get_node_or_null("RightLegMesh") as MeshInstance3D
-	if rl_m:
-		rl_m.material_override = b_mat
-
-func equip_weapon(weapon_id: int) -> void:
-	if current_weapon_id == weapon_id and weapon_instance != null:
+func _apply_materials() -> void:
+	if lod_mesh_instance:
+		lod_mesh_instance.material_override = mat_vertex_lit
 		return
 
-	current_weapon_id = weapon_id
-	rotary_cluster = null
+	if visor_mesh:
+		visor_mesh.material_override = mat_enemy_visor if is_enemy else mat_ally_visor
 
-	# Remove old weapon
-	if is_instance_valid(weapon_instance):
-		weapon_instance.queue_free()
-		weapon_instance = null
+func equip_weapon(wid: int) -> void:
+	current_weapon_id = wid
+	if lod_mesh_instance:
+		var lod_key = "%s_%d_w%d" % ["en" if is_enemy else "al", variant, current_weapon_id]
+		if mesh_cache_lod.has(lod_key):
+			lod_mesh_instance.mesh = mesh_cache_lod[lod_key]
+			lod_mesh_instance.material_override = mat_vertex_lit
+		return
 
-	var scene: PackedScene = weapon_scenes.get(weapon_id, weapon_scenes[0])
-	if scene:
-		weapon_instance = scene.instantiate()
-		weapon_mount.add_child(weapon_instance)
+	if weapon_mesh_instance:
+		weapon_mesh_instance.mesh = mesh_cache_weapon.get(wid, mesh_cache_weapon[0])
+		weapon_mesh_instance.material_override = mat_vertex_lit
+		if muzzle_point:
+			match wid:
+				0: muzzle_point.position = Vector3(0, 0.04, 0.44)
+				1: muzzle_point.position = Vector3(0, 0.04, 0.46)
+				2: muzzle_point.position = Vector3(0, 0.04, 0.48)
 
-		match weapon_id:
-			0: # Assault Rifle
-				weapon_instance.scale = Vector3(0.48, 0.48, 0.48)
-				weapon_instance.rotation_degrees = Vector3(0, 0, 0)
-				weapon_instance.position = Vector3(0, 0, 0.05)
-				muzzle_point.position = Vector3(0, 0.06, 0.46)
-			1: # Combat Shotgun
-				weapon_instance.scale = Vector3(0.52, 0.52, 0.52)
-				weapon_instance.rotation_degrees = Vector3(0, 0, 0)
-				weapon_instance.position = Vector3(0, -0.02, 0.04)
-				muzzle_point.position = Vector3(0, 0.05, 0.42)
-			2: # Plasma Minigun
-				weapon_instance.scale = Vector3(0.38, 0.38, 0.38)
-				weapon_instance.rotation_degrees = Vector3(0, 0, 0)
-				weapon_instance.position = Vector3(0, -0.05, -0.05)
-				muzzle_point.position = Vector3(0, 0.06, 0.58)
-				rotary_cluster = weapon_instance.find_child("cluster", true, false) as Node3D
+func animate_motion(delta: float, speed_factor: float = 1.0, is_articulated: bool = true, steer_bank: float = 0.0, phase_offset: float = 0.0) -> void:
+	walk_time += delta * 12.0 * speed_factor
 
-func animate_motion(delta: float, speed_factor: float = 1.0, full_articulation: bool = true) -> void:
-	walk_time += delta * 14.0 * speed_factor
+	# Smooth banking tilt into directional turns
+	current_tilt = lerpf(current_tilt, steer_bank, delta * 14.0)
 
-	# Runner bounce
-	torso_node.position.y = 0.42 + abs(sin(walk_time)) * 0.05
+	if is_articulated:
+		var stride = sin(walk_time + phase_offset)
+		if left_leg:
+			left_leg.rotation_degrees.x = stride * 32.0
+		if right_leg:
+			right_leg.rotation_degrees.x = -stride * 32.0
 
-	if full_articulation:
-		# Leg stride rotation
-		var stride_angle = sin(walk_time) * 34.0
-		left_leg.rotation_degrees.x = stride_angle
-		right_leg.rotation_degrees.x = -stride_angle
+		if torso_node:
+			# Energetic bouncy stride bobbing & banking tilt
+			torso_node.position.y = 0.42 + abs(stride) * 0.055
+			torso_node.rotation.z = current_tilt
+	else:
+		if lod_mesh_instance:
+			var bounce = abs(sin(walk_time + phase_offset)) * 0.045
+			lod_mesh_instance.position.y = bounce
+			lod_mesh_instance.rotation.z = current_tilt
 
-		torso_node.rotation_degrees.z = sin(walk_time * 0.5) * 2.5
-		head_node.rotation_degrees.x = sin(walk_time) * 3.0
-
-		# Arm counter-sway
-		left_arm.rotation_degrees.x = -stride_angle * 0.35
-		right_arm.rotation_degrees.x = stride_angle * 0.25
-
-	# Recover recoil
+	# Weapon recoil recovery
 	if recoil_offset > 0.0:
-		recoil_offset = maxf(0.0, recoil_offset - delta * 1.8)
-		weapon_mount.position.z = 0.22 - recoil_offset
+		recoil_offset = maxf(0.0, recoil_offset - delta * 0.90)
+		if weapon_mount:
+			weapon_mount.position.z = 0.24 - recoil_offset
 
 	# Muzzle flash timer
 	if flash_timer > 0.0:
 		flash_timer -= delta
-		if flash_timer <= 0.0:
+		if flash_timer <= 0.0 and muzzle_flash:
 			muzzle_flash.visible = false
-
-	# Rotary barrel spin
-	if rotary_cluster and speed_factor > 0.1:
-		rotary_cluster.rotation_degrees.z += 900.0 * delta
 
 func trigger_recoil() -> void:
 	recoil_offset = 0.12
-	weapon_mount.position.z = 0.22 - recoil_offset
-
-	# Muzzle flash
-	muzzle_flash.visible = true
-	flash_timer = 0.06
-	muzzle_flash.scale = Vector3(randf_range(0.8, 1.3), randf_range(0.8, 1.3), randf_range(1.0, 1.6))
+	flash_timer = 0.05
+	if weapon_mount:
+		weapon_mount.position.z = 0.24 - recoil_offset
+	if muzzle_flash:
+		muzzle_flash.visible = true
+		muzzle_flash.rotation_degrees.z = randf_range(0.0, 360.0)
 
 func get_muzzle_global_position() -> Vector3:
-	if is_inside_tree() and muzzle_point:
+	if muzzle_point and is_instance_valid(muzzle_point):
 		return muzzle_point.global_position
-	if is_inside_tree():
-		return global_position + Vector3(0, 0.45, -0.45)
-	return Vector3(0, 0.45, -0.45)
+	return global_position + Vector3(0, 0.45, -0.45)
 
 func play_spawn() -> void:
-	scale = Vector3.ZERO
-	var tw = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(self, "scale", Vector3.ONE, 0.28)
+	scale = Vector3(0.05, 0.05, 0.05)
+	var tween = create_tween()
+	tween.tween_property(self, "scale", Vector3.ONE, 0.20).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func play_defeat(on_complete: Callable = Callable()) -> void:
+	play_defeat_tumble(on_complete)
+
+func play_defeat_tumble(on_complete: Callable = Callable()) -> void:
 	var tw = create_tween().set_parallel(true)
-	tw.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	# Tumble backward and squash
-	tw.tween_property(self, "position:y", position.y + 0.5, 0.25)
-	tw.tween_property(self, "rotation_degrees:x", rotation_degrees.x + 75.0, 0.35)
-	tw.tween_property(self, "rotation_degrees:z", randf_range(-40.0, 40.0), 0.35)
-	tw.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.35)
+	tw.tween_property(self, "position:y", position.y + 0.35, 0.22)
+	tw.tween_property(self, "position:z", position.z + 0.45, 0.30)
+	tw.tween_property(self, "rotation_degrees:x", rotation_degrees.x + 85.0, 0.30)
+	tw.tween_property(self, "rotation_degrees:z", randf_range(-45.0, 45.0), 0.30)
+	tw.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.30)
 	if on_complete.is_valid():
 		tw.chain().tween_callback(on_complete)
