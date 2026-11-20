@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://dcomparisonscene"]
+
+[ext_resource type="Script" path="res://scripts/tools/model_comparison.gd" id="1_comp"]
+
+[node name="ModelComparison" type="Node3D"]
+script = ExtResource("1_comp")

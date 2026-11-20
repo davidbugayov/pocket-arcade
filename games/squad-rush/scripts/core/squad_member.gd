@@ -23,6 +23,7 @@ func _ready() -> void:
 func setup_member(idx: int, front_row: bool) -> void:
 	member_index = idx
 	is_front_row = front_row
+	rotation_degrees.y = sin(float(member_index) * 1.7) * 3.5
 	_build_model()
 
 func _build_model() -> void:
@@ -58,7 +59,8 @@ func update_member(delta: float, can_shoot: bool, weapon_data: Dictionary, dmg_m
 		if current_equipped_weapon != wid:
 			current_equipped_weapon = wid
 			soldier_model.equip_weapon(wid)
-		soldier_model.animate_motion(delta, 1.0, articulate, steer_bank, float(member_index) * 0.45)
+		var phase = float(member_index) * 0.785
+		soldier_model.animate_motion(delta, 1.0, articulate, steer_bank, phase)
 
 	if can_shoot:
 		fire_timer -= delta

@@ -139,3 +139,14 @@ All external 3D models were discovered, inspected, and fetched via the Polyfork 
   - Pre-baked shared procedural `ArrayMesh` surfaces via `SurfaceTool` with 100% shared static materials.
   - Pre-baked single-draw-call weapon meshes.
   - Articulated 4-mesh front rows + single-mesh 1-draw-call rear row LOD, reducing squad draw calls from 3,800 to ~90-120 draw calls.
+
+---
+
+## 5. Clean-Room Genre References & Independence
+
+- **Genre References Studied**:
+  - *Last War: Survival* (`com.fun.lastwar.gp`) — Studied via non-intrusive exterior observation (Craft Anything clean-room mode on physical Android device) for pacing, gate color contrast, and crowd density.
+  - *Real War: Not Fake* — Conceptual genre reference for obstacle placement and squad auto-runner mechanics.
+- **Design Independence & Originality**:
+  - All gameplay logic, algorithms, levels, math gate mechanics, enemy AI, boss telegraph patterns, audio generation, UI layouts, shaders, and balance systems are 100% original custom GDScript implementations created specifically for *Pocket Arcade: Squad Rush*.
+  - No proprietary art, audio, textures, or code from external games were copied, extracted, or included in this repository. All 3D assets are sourced strictly under Creative Commons Attribution 4.0 (CC BY 4.0) from Polyfork or procedurally constructed via Godot's `SurfaceTool` with pre-baked vertex colors.

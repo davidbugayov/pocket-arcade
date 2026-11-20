@@ -217,12 +217,12 @@ func _on_squad_damaged(_loss: int) -> void:
 
 func spawn_gate_pair(z_pos: float, left_op: MathGate.OperationType, left_val: int, right_op: MathGate.OperationType, right_val: int) -> void:
 	var left_gate = MathGate.new()
-	left_gate.position = Vector3(-2.1, 0, z_pos)
+	left_gate.position = Vector3(-2.0, 0, z_pos)
 	gates_container.add_child(left_gate)
 	left_gate.setup(left_op, left_val, true)
 
 	var right_gate = MathGate.new()
-	right_gate.position = Vector3(2.1, 0, z_pos)
+	right_gate.position = Vector3(2.0, 0, z_pos)
 	gates_container.add_child(right_gate)
 	right_gate.setup(right_op, right_val, false)
 

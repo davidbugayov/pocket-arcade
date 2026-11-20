@@ -11,6 +11,7 @@ enum OperationType {
 
 @export var operation: OperationType = OperationType.ADD
 @export var value: int = 5
+@export var initial_value: int = 5
 @export var is_left_gate: bool = true
 @export var partner_gate: MathGate = null
 
@@ -43,11 +44,12 @@ func _ready() -> void:
 func setup(op: OperationType, val: int, left_side: bool) -> void:
 	operation = op
 	value = val
+	initial_value = val
 	is_left_gate = left_side
 	_update_display()
 
 func _build_visuals() -> void:
-	var gate_width = 3.9
+	var gate_width = 3.2
 	var gate_height = 3.2
 
 	# Translucent Energy Barrier
@@ -162,7 +164,7 @@ func _setup_trigger() -> void:
 
 	var col = CollisionShape3D.new()
 	var box = BoxShape3D.new()
-	box.size = Vector3(3.9, 3.5, 2.0)
+	box.size = Vector3(3.2, 3.5, 2.0)
 	col.shape = box
 	col.position.y = 1.75
 	area.add_child(col)
@@ -180,7 +182,7 @@ func _setup_trigger() -> void:
 
 	var s_col = CollisionShape3D.new()
 	var s_box = BoxShape3D.new()
-	s_box.size = Vector3(3.9, 3.2, 0.4)
+	s_box.size = Vector3(3.2, 3.2, 0.4)
 	s_col.shape = s_box
 	s_col.position.y = 1.6
 	shootable_hitbox.add_child(s_col)
@@ -201,23 +203,34 @@ func on_bullet_hit(_damage: float = 1.0, ignore_rate_limit: bool = false) -> voi
 		last_bullet_hit_time = cur_time
 
 	# Deliberate gate tuning: upgrades require intentional focus, negative gates don't become free exploits
+	# Maximum delta from shooting is +2 (ensures safe lane never outscales or trivializes risky lane)
 	match operation:
 		OperationType.ADD:
-			if value < MAX_GATE_VALUE_ADD:
-				value += 1
+			add_bullet_hits += 1
+			var hits_needed = 1 if ignore_rate_limit else 2
+			if add_bullet_hits >= hits_needed:
+				add_bullet_hits = 0
+				if value < initial_value + 2 and value < MAX_GATE_VALUE_ADD:
+					value += 1
 		OperationType.SUBTRACT:
-			# Soften penalty down to -1, but prevent automatic conversion to positive exploit
-			if value > 1:
-				value -= 1
+			subtract_bullet_hits += 1
+			var hits_needed = 1 if ignore_rate_limit else 2
+			if subtract_bullet_hits >= hits_needed:
+				subtract_bullet_hits = 0
+				# Soften penalty down to -1, but prevent automatic conversion to positive exploit
+				if value > 1:
+					value -= 1
 		OperationType.MULTIPLY:
 			multiplier_bullet_hits += 1
-			if multiplier_bullet_hits >= 6:
+			var hits_needed = 2 if ignore_rate_limit else 6
+			if multiplier_bullet_hits >= hits_needed:
 				multiplier_bullet_hits = 0
-				if value < MAX_GATE_VALUE_MULT:
+				if value < initial_value + 1 and value < MAX_GATE_VALUE_MULT:
 					value += 1
 		OperationType.DIVIDE:
 			multiplier_bullet_hits += 1
-			if multiplier_bullet_hits >= 6:
+			var hits_needed = 2 if ignore_rate_limit else 6
+			if multiplier_bullet_hits >= hits_needed:
 				multiplier_bullet_hits = 0
 				if value > 2:
 					value -= 1

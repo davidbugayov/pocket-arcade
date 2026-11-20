@@ -78,7 +78,7 @@ const COL_EN_BOOTS   = Color(0.08, 0.08, 0.08)
 
 # Weapons: Gunmetal receiver, steel barrel, dark grip
 const COL_GUN_RECEIVER = Color(0.18, 0.20, 0.24)
-const COL_GUN_BARREL   = Color(0.32, 0.34, 0.38)
+const COL_GUN_BARREL   = Color(0.72, 0.76, 0.82)
 const COL_GUN_MAGAZINE = Color(0.12, 0.13, 0.16)
 
 func _init() -> void:
@@ -318,8 +318,17 @@ static func _generate_upper_body_mesh(v: int, is_en: bool = false) -> ArrayMesh:
 			# Broad heavy shoulder armor plates (clearly widens shoulders from behind!)
 			for side in [-1, 1]:
 				var h_plate = BoxMesh.new()
-				h_plate.size = Vector3(0.14, 0.08, 0.20)
-				_append_colored_primitive(st, h_plate, Transform3D(Basis(Vector3(0, 0, 1), deg_to_rad(side * -15)), Vector3(side * 0.25, 0.16, 0.01)), c_armor)
+				h_plate.size = Vector3(0.16, 0.09, 0.22)
+				_append_colored_primitive(st, h_plate, Transform3D(Basis(Vector3(0, 0, 1), deg_to_rad(side * -15)), Vector3(side * 0.26, 0.16, 0.01)), c_armor)
+
+			# Heavy armored rear battery pack with status diode
+			var battery = BoxMesh.new()
+			battery.size = Vector3(0.22, 0.22, 0.10)
+			_append_colored_primitive(st, battery, Transform3D(Basis(), Vector3(0, 0.02, -0.16)), COL_GUN_RECEIVER)
+			var diode = BoxMesh.new()
+			diode.size = Vector3(0.06, 0.04, 0.03)
+			var diode_col = Color(0.2, 0.9, 0.4) if not is_en else Color(1.0, 0.3, 0.1)
+			_append_colored_primitive(st, diode, Transform3D(Basis(), Vector3(0.06, 0.08, -0.215)), diode_col)
 
 			# Heavy chest magazine pouches
 			for side in [-0.07, 0.07]:
@@ -330,8 +339,8 @@ static func _generate_upper_body_mesh(v: int, is_en: bool = false) -> ArrayMesh:
 		2: # Variant 2: Specialist — Compact tactical backpack with radio antenna mast (prominent from behind!)
 			# Rear communication survival backpack
 			var pack = BoxMesh.new()
-			pack.size = Vector3(0.24, 0.26, 0.12)
-			_append_colored_primitive(st, pack, Transform3D(Basis(), Vector3(0, 0.04, -0.18)), c_pack)
+			pack.size = Vector3(0.24, 0.28, 0.14)
+			_append_colored_primitive(st, pack, Transform3D(Basis(), Vector3(0, 0.05, -0.18)), c_pack)
 
 			# Backpack straps over shoulders
 			for side in [-0.11, 0.11]:
@@ -339,9 +348,17 @@ static func _generate_upper_body_mesh(v: int, is_en: bool = false) -> ArrayMesh:
 				strap.size = Vector3(0.04, 0.28, 0.02)
 				_append_colored_primitive(st, strap, Transform3D(Basis(), Vector3(side, 0.08, -0.01)), c_gear)
 
-			# Slender tactical radio antenna mast extending up from backpack
-			var antenna = _make_cylinder(0.012, 0.018, 0.44, 6)
-			_append_colored_primitive(st, antenna, Transform3D(Basis(), Vector3(-0.09, 0.38, -0.22)), COL_GUN_BARREL)
+			# Slender tactical radio antenna mast extending up from backpack with luminous tip
+			var antenna = _make_cylinder(0.012, 0.018, 0.48, 6)
+			_append_colored_primitive(st, antenna, Transform3D(Basis(), Vector3(-0.09, 0.40, -0.22)), COL_GUN_BARREL)
+			var tip = _make_sphere(0.025, 0.05, 6, 3)
+			_append_colored_primitive(st, tip, Transform3D(Basis(), Vector3(-0.09, 0.65, -0.22)), c_visor)
+
+			# Brow sensor goggles on helmet
+			for g_side in [-0.06, 0.06]:
+				var goggle = _make_cylinder(0.025, 0.025, 0.05, 6)
+				var g_rot = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(90)), Vector3(g_side, 0.38, 0.14))
+				_append_colored_primitive(st, goggle, g_rot, COL_GUN_RECEIVER)
 
 	return st.commit()
 

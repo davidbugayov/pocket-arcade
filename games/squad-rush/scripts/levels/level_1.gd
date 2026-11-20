@@ -27,33 +27,39 @@ func _build_level_layout() -> void:
 	spawn_obstacle(Vector3(2.1, 0, -25.0), Obstacle.ObstacleType.TIRE_STACK, 12.0, 5)
 
 	# 2. Gate 1: Safe vs Risky Route (-55.0)
-	# Left: Safe +3 in open lane. Right: Risky +7 guarded by a charging Runner!
-	spawn_gate_pair(-55.0, MathGate.OperationType.ADD, 3, MathGate.OperationType.ADD, 7)
-	spawn_enemy(Vector3(2.1, 0, -45.0), 12.0, 6, true, EnemyUnit.EnemyType.RUNNER)
+	# Center: Concrete median barricade prevents zero-steering autopilot
+	spawn_obstacle(Vector3(0.0, 0, -55.0), Obstacle.ObstacleType.CONCRETE_BLOCK, 20.0, 5)
+	# Left: Safe +3 in open lane. Right: Risky +6 guarded by a charging Runner!
+	spawn_gate_pair(-55.0, MathGate.OperationType.ADD, 3, MathGate.OperationType.ADD, 6)
+	spawn_enemy(Vector3(2.0, 0, -45.0), 12.0, 6, true, EnemyUnit.EnemyType.RUNNER)
 
-	# 3. Encounter 1: Fast Charging Enemy Runners (-85.0 to -92.0)
-	# Forces player to shoot or steer before runners crash into the squad!
-	spawn_enemy(Vector3(-1.2, 0, -88.0), 12.0, 6, true, EnemyUnit.EnemyType.RUNNER)
-	spawn_enemy(Vector3(1.2, 0, -92.0), 12.0, 6, true, EnemyUnit.EnemyType.RUNNER)
+	# 3. Encounter 1: Differentiated Enemy Roles (-88.0 to -94.0)
+	# Left: Shooter covers lane with telegraphed laser (dodgeable). Right: Fast Runner charges!
+	spawn_enemy(Vector3(-1.8, 0, -88.0), 20.0, 8, false, EnemyUnit.EnemyType.SHOOTER)
+	spawn_enemy(Vector3(1.8, 0, -94.0), 12.0, 6, true, EnemyUnit.EnemyType.RUNNER)
 
 	# 4. Gate 2: Multiplier vs Addition (-115.0)
-	# Left: x2 behind wooden ammo crate (HP 16.0). Right: +5 in open lane.
-	spawn_obstacle(Vector3(-2.1, 0, -108.0), Obstacle.ObstacleType.CRATE, 16.0, 8)
-	spawn_gate_pair(-115.0, MathGate.OperationType.MULTIPLY, 2, MathGate.OperationType.ADD, 5)
+	# Center: Dividing hazard barrel
+	spawn_obstacle(Vector3(0.0, 0, -115.0), Obstacle.ObstacleType.BARREL, 18.0, 6)
+	# Left: x2 behind wooden ammo crate (HP 16.0). Right: +4 in open lane.
+	spawn_obstacle(Vector3(-2.0, 0, -108.0), Obstacle.ObstacleType.CRATE, 16.0, 8)
+	spawn_gate_pair(-115.0, MathGate.OperationType.MULTIPLY, 2, MathGate.OperationType.ADD, 4)
 
 	# 5. Encounter 2: Bridge Checkpoint (-145.0)
 	# Heavy Shielder blocks center lane; Shooter covers right flank with telegraphed laser!
 	spawn_enemy(Vector3(0.0, 0, -145.0), 50.0, 16, false, EnemyUnit.EnemyType.SHIELDER)
-	spawn_enemy(Vector3(2.1, 0, -148.0), 20.0, 8, false, EnemyUnit.EnemyType.SHOOTER)
+	spawn_enemy(Vector3(2.0, 0, -148.0), 20.0, 8, false, EnemyUnit.EnemyType.SHOOTER)
 
 	# 6. In-Run Weapon Pickup (-172.0)
-	# Combat Shotgun: heavy close-range 4-pellet spread for clearing barriers and clusters!
-	spawn_weapon_pickup(Vector3(0.0, 0, -172.0), 1, "COMBAT SHOTGUN")
+	# Combat Shotgun: positioned in Left Lane (requires deliberate steering to acquire)
+	spawn_weapon_pickup(Vector3(-2.0, 0, -172.0), 1, "COMBAT SHOTGUN")
 
 	# 7. Gate 3: High Reward vs Safe Route (-205.0)
+	# Center: Concrete divider
+	spawn_obstacle(Vector3(0.0, 0, -205.0), Obstacle.ObstacleType.CONCRETE_BLOCK, 20.0, 6)
 	# Left: +6 in open lane. Right: x2 guarded by 2 Hazard Barrels (HP 20.0)
 	spawn_obstacle(Vector3(1.4, 0, -198.0), Obstacle.ObstacleType.BARREL, 20.0, 10)
-	spawn_obstacle(Vector3(2.8, 0, -198.0), Obstacle.ObstacleType.BARREL, 20.0, 10)
+	spawn_obstacle(Vector3(2.6, 0, -198.0), Obstacle.ObstacleType.BARREL, 20.0, 10)
 	spawn_gate_pair(-205.0, MathGate.OperationType.ADD, 6, MathGate.OperationType.MULTIPLY, 2)
 
 	# 8. Encounter 3: Defense Line before Boss (-240.0)
