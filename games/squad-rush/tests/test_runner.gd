@@ -800,3 +800,19 @@ func test_main_menu_dock_and_level1_sections() -> void:
 	assert_test(MathGate.MAX_LABEL_DIST >= 80.0, "MathGate MAX_LABEL_DIST is >= 80m for early route preview")
 
 	lvl.free()
+
+	# 4. Level 2 (Industrial Causeway - 3 Sections)
+	var lvl2 = Level2.new()
+	add_child(lvl2)
+	assert_test(lvl2.level_number == 2, "Level 2 number is 2")
+	assert_test(lvl2.boss_z_position == -275.0, "Level 2 boss positioned at -275.0 in Proving Grounds arena")
+	assert_test(lvl2.get_child_count() > 30, "Level 2 contains rich 3-section environment architecture")
+	lvl2.free()
+
+	# 5. Level 3 (Orbital Skyway & Titan Citadel - 3 Sections)
+	var lvl3 = Level3.new()
+	add_child(lvl3)
+	assert_test(lvl3.level_number == 3, "Level 3 number is 3")
+	assert_test(lvl3.boss_z_position == -335.0, "Level 3 boss positioned at -335.0 in Citadel arena")
+	assert_test(lvl3.get_child_count() > 30, "Level 3 contains rich 3-section environment architecture")
+	lvl3.free()
