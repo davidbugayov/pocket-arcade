@@ -31,6 +31,8 @@ func _generate_all_sounds() -> void:
 	streams["victory"] = _synth_victory()
 	streams["defeat"] = _synth_defeat()
 	streams["click"] = _synth_click()
+	streams["weapon_upgrade"] = _synth_weapon_upgrade()
+	streams["boss_alert"] = _synth_boss_alert()
 
 func play(sound_name: String, pitch_rnd: float = 0.05) -> void:
 	if not GameManager.sound_enabled:
@@ -241,6 +243,46 @@ func _synth_click() -> AudioStreamWAV:
 		phase += 2.0 * PI * 800.0 / float(rate)
 		var env = (1.0 - t) * (1.0 - t)
 		var sample = sin(phase) * env * 0.4
+		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
+		bytes[i] = byte_val
+
+	return _make_wav(bytes, rate)
+
+func _synth_weapon_upgrade() -> AudioStreamWAV:
+	var rate = 22050
+	var duration = 0.35
+	var total_samples = int(rate * duration)
+	var bytes = PackedByteArray()
+	bytes.resize(total_samples)
+
+	var freqs = [440.0, 554.37, 659.25, 880.0]
+	var seg = total_samples / freqs.size()
+	var phase = 0.0
+	for i in range(total_samples):
+		var idx = clampi(i / seg, 0, freqs.size() - 1)
+		phase += 2.0 * PI * freqs[idx] / float(rate)
+		var t = float(i) / float(total_samples)
+		var env = 1.0 - (t * 0.4)
+		var sample = (sin(phase) + 0.25 * sin(phase * 2.0)) * env * 0.65
+		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
+		bytes[i] = byte_val
+
+	return _make_wav(bytes, rate)
+
+func _synth_boss_alert() -> AudioStreamWAV:
+	var rate = 22050
+	var duration = 0.48
+	var total_samples = int(rate * duration)
+	var bytes = PackedByteArray()
+	bytes.resize(total_samples)
+
+	var phase = 0.0
+	for i in range(total_samples):
+		var t = float(i) / float(total_samples)
+		var siren_f = 780.0 if int(t * 8.0) % 2 == 0 else 520.0
+		phase += 2.0 * PI * siren_f / float(rate)
+		var env = 1.0 - (t * 0.2)
+		var sample = (sin(phase) + 0.35 * (randf() * 2.0 - 1.0)) * env * 0.75
 		var byte_val = clampi(int((sample * 0.5 + 0.5) * 255.0), 0, 255)
 		bytes[i] = byte_val
 

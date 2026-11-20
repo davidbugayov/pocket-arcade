@@ -30,6 +30,7 @@ func _ready() -> void:
 	test_rescue_barrel_mechanic()
 	test_level2_and_level3_balance()
 	test_candidate_models_and_comparison_scene()
+	test_main_menu_dock_and_level1_sections()
 
 	print("====================================================")
 	print("  TEST RESULTS: Passed: %d / %d (Failed: %d)" % [passed_tests, total_tests, failed_tests])
@@ -757,3 +758,45 @@ func test_candidate_models_and_comparison_scene() -> void:
 		var cmp_btn = mm_inst.get_node_or_null("TopPanel/CompareBtn")
 		assert_test(cmp_btn != null, "Main menu contains CompareBtn")
 		mm_inst.free()
+
+func test_main_menu_dock_and_level1_sections() -> void:
+	print("\n--- Test: Main Menu Dock Composition & Level 1 3-Section Layout ---")
+
+	# 1. Main Menu Dock & Primary Action Button
+	var mm_scene = load("res://scenes/main_menu.tscn")
+	assert_test(mm_scene != null, "Main menu scene loads")
+	if mm_scene:
+		var mm = mm_scene.instantiate()
+		add_child(mm)
+
+		var play_btn = mm.get_node_or_null("BottomArea/PlayBtn") as Button
+		assert_test(play_btn != null, "Main menu has prominent PlayBtn")
+		if play_btn:
+			assert_test("MISSION" in play_btn.text and ("PLAY" in play_btn.text or "CONTINUE" in play_btn.text), "Play button displays upcoming mission and clear CTA")
+
+		var dock_scene = mm.find_child("DockScene", true, false)
+		assert_test(dock_scene != null, "Main menu contains 3D DockScene viewport")
+		if dock_scene:
+			assert_test(dock_scene.get("searchlight") != null, "DockScene has moving security searchlight")
+			assert_test(dock_scene.get("lead_soldier") != null, "DockScene has lead combat android")
+
+		# Secondary Drawers
+		assert_test(mm.get_node_or_null("UpgradesDrawer") != null, "Upgrades drawer exists")
+		assert_test(mm.get_node_or_null("ArmoryDrawer") != null, "Armory drawer exists")
+		assert_test(mm.get_node_or_null("MissionsDrawer") != null, "Missions drawer exists")
+
+		mm.free()
+
+	# 2. Sound synthesis additions
+	assert_test(SoundManager.streams.has("weapon_upgrade"), "SoundManager synthesizes weapon_upgrade")
+	assert_test(SoundManager.streams.has("boss_alert"), "SoundManager synthesizes boss_alert")
+
+	# 3. Level 1 Layout & 3 Sections
+	var lvl = Level1.new()
+	add_child(lvl)
+
+	assert_test(lvl.level_number == 1, "Level number is 1")
+	assert_test(lvl.boss_z_position == -310.0, "Boss positioned at -310.0 in Sea Lock arena")
+	assert_test(MathGate.MAX_LABEL_DIST >= 80.0, "MathGate MAX_LABEL_DIST is >= 80m for early route preview")
+
+	lvl.free()

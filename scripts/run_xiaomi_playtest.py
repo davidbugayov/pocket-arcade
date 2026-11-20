@@ -85,16 +85,16 @@ def main():
     rec_proc = subprocess.Popen(rec_cmd)
 
     time.sleep(1.0)
-    adb(f"shell am start -n {PACKAGE}/{ACTIVITY}")
-    time.sleep(3.0)
+    adb(f"shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n {PACKAGE}/{ACTIVITY}")
+    time.sleep(4.5)
     take_screenshot("01_main_menu.png")
 
-    print("Tapping Level 1 button (540, 710)...")
-    adb("shell input tap 540 710")
+    print("Tapping Play button (540, 2020)...")
+    adb("shell input tap 540 2020")
     t0 = time.time()
 
     time.sleep(2.0)
-    take_screenshot("02_level1_intro.png")
+    take_screenshot("02_section1_docks.png")
 
     # t = 4.8s: Steer LEFT to Gate 1 (+3 safe route, z = -55)
     wait_until = t0 + 4.8
@@ -104,7 +104,7 @@ def main():
     adb("shell input swipe 540 1800 220 1800 250")
 
     time.sleep(1.8)
-    take_screenshot("03_gate1_passed_squad4.png")
+    take_screenshot("gate1_passed_squad4.png")
 
     # t = 7.2s: Steer back to CENTER
     wait_until = t0 + 7.2
@@ -120,18 +120,18 @@ def main():
     print("Steering LEFT to Gate 2 (x2 multiplier)...")
     adb("shell input swipe 540 1800 220 1800 250")
 
-    time.sleep(2.0)
-    take_screenshot("04_gate2_squad8.png")
-
-    # t = 14.5s: Steer back to CENTER for Combat Shotgun pickup & Checkpoint
+    # t = 14.5s: Steer back to CENTER for Combat Shotgun pickup & Cargo Terminal
     wait_until = t0 + 14.5
     if time.time() < wait_until:
         time.sleep(wait_until - time.time())
-    print("Steering to CENTER for Combat Shotgun pickup (z = -172)...")
+    print("Steering to CENTER for Combat Shotgun pickup & Cargo Terminal (z = -172)...")
     adb("shell input swipe 220 1800 540 1800 250")
 
-    time.sleep(3.5)
-    take_screenshot("05_weapon_pickup_shotgun.png")
+    # t = 17.5s: Capture Section 2: Cargo Terminal
+    wait_until = t0 + 17.5
+    if time.time() < wait_until:
+        time.sleep(wait_until - time.time())
+    take_screenshot("03_section2_cargo_terminal.png")
 
     # t = 20.2s: Steer LEFT to Gate 3 (+6 route, z = -205)
     wait_until = t0 + 20.2
@@ -140,22 +140,19 @@ def main():
     print("Steering LEFT to Gate 3 (+6 route)...")
     adb("shell input swipe 540 1800 220 1800 250")
 
-    time.sleep(2.5)
-    take_screenshot("06_squad14_defense_line.png")
-
     # t = 24.5s: Steer back to CENTER for Defense line and Boss arena
     wait_until = t0 + 24.5
     if time.time() < wait_until:
         time.sleep(wait_until - time.time())
-    print("Advancing to Boss Arena (Squad = 14 soldiers)...")
+    print("Advancing toward Sea Lock and Boss Arena (Squad = 14 soldiers)...")
     adb("shell input swipe 220 1800 540 1800 250")
 
-    # t = 32.5s: Boss Arena engagement begins!
+    # t = 32.5s: Sea Lock Arena entrance & Boss sighting!
     wait_until = t0 + 32.5
     if time.time() < wait_until:
         time.sleep(wait_until - time.time())
-    print("⚔️ Boss Combat Engaged: Iron Sentinel (950 HP)!")
-    take_screenshot("07_boss_combat_telegraph.png")
+    print("⚔️ Boss Arena Approached: Iron Sentinel visible in Sea Lock!")
+    take_screenshot("04_section3_sea_lock_boss.png")
 
     # Boss Attack 1 dodge: Boss sweeps center/left, steer RIGHT at t = 34.0s
     wait_until = t0 + 34.0
@@ -191,7 +188,7 @@ def main():
         time.sleep(wait_until - time.time())
     print("Boss eliminated! Awaiting Victory Screen...")
     time.sleep(2.5)
-    take_screenshot("08_victory_screen.png")
+    take_screenshot("05_victory_screen.png")
 
     try:
         rec_proc.wait(timeout=10)
@@ -218,12 +215,12 @@ def main():
     push_save(starter_save)
     clear_logcat()
 
-    adb(f"shell am start -n {PACKAGE}/{ACTIVITY}")
-    time.sleep(2.5)
-    adb("shell input tap 540 710")
+    adb(f"shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n {PACKAGE}/{ACTIVITY}")
+    time.sleep(3.5)
+    adb("shell input tap 540 2020")
     print("Running with 0 steering input for 38 seconds...")
     time.sleep(38.0)
-    take_screenshot("09_defeat_screen.png")
+    take_screenshot("06_defeat_screen.png")
 
     log2 = dump_logcat()
     with open(os.path.join(ARTIFACTS_DIR, "scenario2_no_steering_logcat.log"), "w") as f:
@@ -233,7 +230,7 @@ def main():
     print("Tapping Retry button (540, 1500)...")
     adb("shell input tap 540 1500")
     time.sleep(2.5)
-    take_screenshot("10_retry_level_restarted.png")
+    take_screenshot("07_retry_level_restarted.png")
 
     # -----------------------------------------------------------------
     # SCENARIO 3: Playthrough with Several Intentional Errors
@@ -243,9 +240,9 @@ def main():
     push_save(starter_save)
     clear_logcat()
 
-    adb(f"shell am start -n {PACKAGE}/{ACTIVITY}")
-    time.sleep(2.5)
-    adb("shell input tap 540 710")
+    adb(f"shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n {PACKAGE}/{ACTIVITY}")
+    time.sleep(3.5)
+    adb("shell input tap 540 2020")
     t0 = time.time()
     time.sleep(2.0)
 
@@ -290,12 +287,12 @@ def main():
     print("Pressing HOME key to background app...")
     adb("shell input keyevent 3")
     time.sleep(2.0)
-    take_screenshot("11_app_backgrounded.png")
+    take_screenshot("08_app_backgrounded.png")
 
     print("Returning app to foreground...")
-    adb(f"shell am start -n {PACKAGE}/{ACTIVITY}")
+    adb(f"shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n {PACKAGE}/{ACTIVITY}")
     time.sleep(2.0)
-    take_screenshot("12_returned_from_background_paused.png")
+    take_screenshot("09_returned_from_background_paused.png")
 
     # Resume game
     print("Tapping Resume button in Pause Overlay (540, 1050)...")
@@ -318,29 +315,37 @@ def main():
         "upgrade_squad_size": 0
     }
     push_save(funded_save)
-    adb(f"shell am start -n {PACKAGE}/{ACTIVITY}")
-    time.sleep(2.5)
+    adb(f"shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n {PACKAGE}/{ACTIVITY}")
+    time.sleep(4.0)
 
-    # Buy Squad Size (UpgBtn at x=850, y=1230 in 720x1560 -> 850*1.5=1275? wait, screen width is 1080)
-    # On 1080x2340: UpgBtn is near right edge (x ~ 880-950, y ~ 1300-1450)
-    print("Purchasing Squad Size upgrade (tap at x=900, y=1340)...")
-    adb("shell input tap 900 1340")
+    # Open Upgrades drawer (tap UpgradesToggleBtn at x=260, y=2180)
+    print("Opening Upgrades drawer (tap at x=260, y=2180)...")
+    adb("shell input tap 260 2180")
+    time.sleep(0.8)
+
+    # Buy Squad Size (UpgBtn0 at x=540, y=930)
+    print("Purchasing Squad Size upgrade (tap at x=540, y=930)...")
+    adb("shell input tap 540 930")
     time.sleep(0.6)
 
-    # Buy Damage upgrade
-    print("Purchasing Damage upgrade (tap at x=900, y=1480)...")
-    adb("shell input tap 900 1480")
+    # Buy Damage upgrade (UpgBtn1 at x=540, y=1065)
+    print("Purchasing Damage upgrade (tap at x=540, y=1065)...")
+    adb("shell input tap 540 1065")
     time.sleep(0.6)
 
-    take_screenshot("13_shop_upgrades_purchased.png")
+    take_screenshot("10_shop_upgrades_purchased.png")
 
     # Force stop and relaunch to test persistence
     print("Force stopping app to test cold restart persistence...")
     adb(f"shell am force-stop {PACKAGE}")
     time.sleep(1.5)
-    adb(f"shell am start -n {PACKAGE}/{ACTIVITY}")
-    time.sleep(2.5)
-    take_screenshot("14_persistence_after_restart.png")
+    adb(f"shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n {PACKAGE}/{ACTIVITY}")
+    time.sleep(4.0)
+
+    # Re-open Upgrades drawer to verify persisted state
+    adb("shell input tap 260 2180")
+    time.sleep(0.8)
+    take_screenshot("11_persistence_after_restart.png")
 
     # -----------------------------------------------------------------
     # SCENARIO 6: Performance Benchmark (10 -> 30 -> 60 Soldiers)
@@ -350,9 +355,9 @@ def main():
     clear_logcat()
 
     adb(f"shell am force-stop {PACKAGE}")
-    adb(f"shell am start -n {PACKAGE}/{ACTIVITY}")
-    time.sleep(2.5)
-    adb("shell input tap 540 710")
+    adb(f"shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n {PACKAGE}/{ACTIVITY}")
+    time.sleep(4.0)
+    adb("shell input tap 540 2020")
     print("Benchmark active! Measuring performance for 12 seconds...")
     time.sleep(12.0)
 

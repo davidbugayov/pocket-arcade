@@ -160,15 +160,30 @@ func _process(delta: float) -> void:
 
 		camera.position = camera.position.lerp(target_pos, delta * 12.0)
 
-		# Compact tutorial triggers: activate sequentially one at a time as player advances
+		# Compact tutorial triggers: activate sequentially one at a time as player advances,
+		# and strictly suppress when approaching math gates to ensure 100% clean gate visibility
 		if is_game_active:
 			var cur_z = player_squad.position.z
-			for trig in tutorial_triggers:
-				if not trig.get("triggered", false) and cur_z <= trig.get("z", 0.0):
-					trig["triggered"] = true
-					if is_instance_valid(hud) and hud.has_method("show_tutorial_hint"):
-						hud.show_tutorial_hint(trig.get("text", ""), trig.get("duration", 3.2))
-					break # Never overlap multiple hints
+
+			var near_active_gate = false
+			if is_instance_valid(gates_container):
+				for g in gates_container.get_children():
+					if g is MathGate and not g.applied:
+						var dz = cur_z - g.global_position.z
+						if dz >= -2.0 and dz <= 28.0:
+							near_active_gate = true
+							break
+
+			if near_active_gate:
+				if is_instance_valid(hud) and hud.has_method("hide_tutorial_hint"):
+					hud.hide_tutorial_hint()
+			else:
+				for trig in tutorial_triggers:
+					if not trig.get("triggered", false) and cur_z <= trig.get("z", 0.0):
+						trig["triggered"] = true
+						if is_instance_valid(hud) and hud.has_method("show_tutorial_hint"):
+							hud.show_tutorial_hint(trig.get("text", ""), trig.get("duration", 3.2))
+						break # Never overlap multiple hints
 
 		if is_instance_valid(boss) and not is_boss_phase and is_game_active:
 			if player_squad.position.z <= boss_z_position + 42.0:
@@ -179,12 +194,16 @@ func shake_camera(intensity: float) -> void:
 
 func _start_boss_battle() -> void:
 	is_boss_phase = true
+	shake_camera(0.35)
 	if is_instance_valid(player_squad):
 		player_squad.stop_at_boss(boss_z_position)
 	if is_instance_valid(boss):
 		boss.activate()
-	if is_instance_valid(hud) and hud.has_method("show_boss_bar"):
-		hud.show_boss_bar(boss.boss_name, boss.max_hp)
+	if is_instance_valid(hud):
+		if hud.has_method("show_boss_alert") and is_instance_valid(boss):
+			hud.show_boss_alert(boss.boss_name)
+		if hud.has_method("show_boss_bar") and is_instance_valid(boss):
+			hud.show_boss_bar(boss.boss_name, boss.max_hp)
 
 func _on_bullet_spawn_requested(pos: Vector3, dir: Vector3, dmg: float, spd: float, col: Color) -> void:
 	if not is_game_active or is_level_completed:

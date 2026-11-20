@@ -157,3 +157,33 @@ To deliver peak 60 FPS mobile performance across 60 simultaneous combatants with
 - **Design Independence & Originality**:
   - All gameplay logic, algorithms, levels, math gate mechanics, enemy AI, boss telegraph patterns, audio generation, UI layouts, shaders, and balance systems are 100% original custom GDScript implementations created specifically for *Pocket Arcade: Squad Rush*.
   - No proprietary art, audio, textures, or code from external games were copied, extracted, or included in this repository. All 3D assets are sourced strictly under Creative Commons Attribution 4.0 (CC BY 4.0) from Polyfork or procedurally constructed via Godot's `SurfaceTool` with pre-baked vertex colors.
+
+---
+
+## 6. Industrial Maritime & Cargo Terminal Architecture (Level 1 & Main Menu Dock)
+
+All architectural structures, cranes, bulkheads, and environment props for the 3 distinct Level 1 sections and the Main Menu pre-mission dock are constructed procedurally using Godot primitive meshes and PBR materials with zero external proprietary asset dependencies:
+
+1. **Pre-Mission Dock (Main Menu)**:
+   - Reinforced concrete embarkation quay slab with yellow/black industrial hazard perimeter striping.
+   - Dual-tier shipping cargo containers (Navy blue and rust red).
+   - Heavy mooring cleats and overhead steel gantry beam.
+   - Dynamic swinging security searchlight (`SpotLight3D`) and warm directional sun lighting.
+
+2. **Section 1: The Docks (Level 1, z = 10.0 to -90.0)**:
+   - Wide embarkation start quay (14.0m width) with yellow/black perimeter caution stripes.
+   - Landmark: Massive harbor portal gantry crane on the left wharf (x = -9.2m, z = -34.0m).
+   - Pier light posts with glowing maritime cyan navigation beacons.
+   - High-contrast green/cyan painted pavement guide chevrons leading to safe Gate 1 (+3).
+   - Diagonal yellow/black hazard striping leading to risky Gate 1 (+6) with charging runner.
+
+3. **Section 2: Cargo Terminal (Level 1, z = -90.0 to -215.0)**:
+   - Multi-tier ISO shipping cargo container stacks (Navy blue, rust red, industrial orange, olive drab) altering horizon skyline.
+   - Landmark: Rail-mounted container overhead gantry crane spanning at z = -158.0m.
+   - Painted diagonal caution stripes on road leading into Ammo Crate (-108.0m) and Hazard Barrels (-198.0m).
+
+4. **Section 3: Sea Lock & Arena (Level 1, z = -215.0 to -330.0)**:
+   - Heavy reinforced steel bulkhead blast walls (x = +/-5.8m, z = -230m to -325m).
+   - Landmark: Colossal industrial Sea Lock Gate Archway (z = -322.0m) framing Iron Sentinel.
+   - Flashing red and amber emergency strobe beacons along lock walls.
+   - High-contrast embedded deck runway light strips (red continuous danger strips along center/right firing lanes; cyan guide strip along safe flanking lane) ensuring instantaneous threat/safe lane distinction even with a 30-60 android crowd.

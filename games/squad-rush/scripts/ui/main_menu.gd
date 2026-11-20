@@ -7,29 +7,67 @@ class_name MainMenu
 @onready var sound_btn: Button = $TopPanel/SoundBtn
 @onready var compare_btn: Button = $TopPanel.get_node_or_null("CompareBtn")
 
-@onready var lvl1_btn: Button = $VBox/LevelSelect/Lvl1Btn
-@onready var lvl2_btn: Button = $VBox/LevelSelect/Lvl2Btn
-@onready var lvl3_btn: Button = $VBox/LevelSelect/Lvl3Btn
+# Primary CTA Button
+@onready var play_btn: Button = $BottomArea/PlayBtn
 
-@onready var upg_squad_btn: Button = $VBox/UpgradesBox/SquadRow/UpgBtn
-@onready var upg_squad_lbl: Label = $VBox/UpgradesBox/SquadRow/StatLbl
+# Nav Toggle Buttons
+@onready var upg_toggle_btn: Button = $BottomArea/NavRow/UpgradesToggleBtn
+@onready var armory_toggle_btn: Button = $BottomArea/NavRow/ArmoryToggleBtn
+@onready var missions_toggle_btn: Button = $BottomArea/NavRow/MissionsToggleBtn
 
-@onready var upg_dmg_btn: Button = $VBox/UpgradesBox/DmgRow/UpgBtn
-@onready var upg_dmg_lbl: Label = $VBox/UpgradesBox/DmgRow/StatLbl
+# Drawers / Overlays
+@onready var upgrades_drawer: Control = $UpgradesDrawer
+@onready var armory_drawer: Control = $ArmoryDrawer
+@onready var missions_drawer: Control = $MissionsDrawer
 
-@onready var upg_fire_btn: Button = $VBox/UpgradesBox/FireRow/UpgBtn
-@onready var upg_fire_lbl: Label = $VBox/UpgradesBox/FireRow/StatLbl
+# Drawer Close Buttons
+@onready var upg_close_btn: Button = $UpgradesDrawer/DrawerBox/CloseBtn
+@onready var armory_close_btn: Button = $ArmoryDrawer/DrawerBox/CloseBtn
+@onready var missions_close_btn: Button = $MissionsDrawer/DrawerBox/CloseBtn
 
-@onready var weapon_tab: HBoxContainer = $VBox/WeaponArmory/WeaponRow
+# Level Select Buttons
+@onready var lvl1_btn: Button = $MissionsDrawer/DrawerBox/LevelSelect/Lvl1Btn
+@onready var lvl2_btn: Button = $MissionsDrawer/DrawerBox/LevelSelect/Lvl2Btn
+@onready var lvl3_btn: Button = $MissionsDrawer/DrawerBox/LevelSelect/Lvl3Btn
+
+# Upgrade Row References
+@onready var upg_squad_btn: Button = $UpgradesDrawer/DrawerBox/UpgradesBox/SquadRow/UpgBtn
+@onready var upg_squad_lbl: Label = $UpgradesDrawer/DrawerBox/UpgradesBox/SquadRow/StatLbl
+
+@onready var upg_dmg_btn: Button = $UpgradesDrawer/DrawerBox/UpgradesBox/DmgRow/UpgBtn
+@onready var upg_dmg_lbl: Label = $UpgradesDrawer/DrawerBox/UpgradesBox/DmgRow/StatLbl
+
+@onready var upg_fire_btn: Button = $UpgradesDrawer/DrawerBox/UpgradesBox/FireRow/UpgBtn
+@onready var upg_fire_lbl: Label = $UpgradesDrawer/DrawerBox/UpgradesBox/FireRow/StatLbl
+
+# Armory References
+@onready var weapon_tab: HBoxContainer = $ArmoryDrawer/DrawerBox/WeaponArmory/WeaponRow
+
+var next_available_mission: int = 1
 
 func _ready() -> void:
 	GameManager.coins_changed.connect(_on_coins_changed)
 	GameManager.upgrades_changed.connect(_on_upgrades_changed)
 
+	# Primary Play CTA
+	play_btn.pressed.connect(_on_play_pressed)
+
+	# Drawer Toggles
+	upg_toggle_btn.pressed.connect(func(): _toggle_drawer(upgrades_drawer))
+	armory_toggle_btn.pressed.connect(func(): _toggle_drawer(armory_drawer))
+	missions_toggle_btn.pressed.connect(func(): _toggle_drawer(missions_drawer))
+
+	# Drawer Close Buttons
+	upg_close_btn.pressed.connect(func(): _close_all_drawers())
+	armory_close_btn.pressed.connect(func(): _close_all_drawers())
+	missions_close_btn.pressed.connect(func(): _close_all_drawers())
+
+	# Level Buttons
 	lvl1_btn.pressed.connect(func(): _start_level(1))
 	lvl2_btn.pressed.connect(func(): _start_level(2))
 	lvl3_btn.pressed.connect(func(): _start_level(3))
 
+	# Upgrade Actions
 	upg_squad_btn.pressed.connect(func(): _buy_upgrade("squad"))
 	upg_dmg_btn.pressed.connect(func(): _buy_upgrade("damage"))
 	upg_fire_btn.pressed.connect(func(): _buy_upgrade("fire_rate"))
@@ -38,21 +76,100 @@ func _ready() -> void:
 	if compare_btn:
 		compare_btn.pressed.connect(_on_compare_clicked)
 
+	_setup_button_styles()
 	_setup_weapon_buttons()
+	_close_all_drawers()
 	_refresh_ui()
+
+func _setup_button_styles() -> void:
+	# 1. Primary Play CTA Button Style (Glowing Emerald Green Military Tactical Style)
+	var sb_play = StyleBoxFlat.new()
+	sb_play.bg_color = Color(0.05, 0.18, 0.12, 0.92)
+	sb_play.border_color = Color(0.18, 0.92, 0.45, 1.0)
+	sb_play.set_border_width_all(3)
+	sb_play.set_corner_radius_all(18)
+	sb_play.shadow_color = Color(0.18, 0.92, 0.45, 0.25)
+	sb_play.shadow_size = 8
+
+	var sb_play_pressed = StyleBoxFlat.new()
+	sb_play_pressed.bg_color = Color(0.10, 0.32, 0.20, 0.98)
+	sb_play_pressed.border_color = Color(0.40, 1.0, 0.60, 1.0)
+	sb_play_pressed.set_border_width_all(3)
+	sb_play_pressed.set_corner_radius_all(18)
+
+	play_btn.add_theme_stylebox_override("normal", sb_play)
+	play_btn.add_theme_stylebox_override("hover", sb_play)
+	play_btn.add_theme_stylebox_override("pressed", sb_play_pressed)
+
+	# 2. Secondary Pill Navigation Buttons
+	var sb_nav = StyleBoxFlat.new()
+	sb_nav.bg_color = Color(0.08, 0.12, 0.18, 0.88)
+	sb_nav.border_color = Color(0.25, 0.45, 0.65, 0.8)
+	sb_nav.set_border_width_all(1)
+	sb_nav.set_corner_radius_all(12)
+
+	for btn in [upg_toggle_btn, armory_toggle_btn, missions_toggle_btn]:
+		if is_instance_valid(btn):
+			btn.add_theme_stylebox_override("normal", sb_nav)
+
+	# 3. Drawer Styles
+	var sb_drawer = StyleBoxFlat.new()
+	sb_drawer.bg_color = Color(0.06, 0.09, 0.15, 0.96)
+	sb_drawer.border_color = Color(0.20, 0.55, 0.85, 0.90)
+	sb_drawer.set_border_width_all(2)
+	sb_drawer.set_corner_radius_all(18)
+	sb_drawer.content_margin_left = 24.0
+	sb_drawer.content_margin_right = 24.0
+	sb_drawer.content_margin_top = 20.0
+	sb_drawer.content_margin_bottom = 20.0
+
+	for d in [upgrades_drawer, armory_drawer, missions_drawer]:
+		if is_instance_valid(d):
+			d.add_theme_stylebox_override("panel", sb_drawer)
+
+func _close_all_drawers() -> void:
+	upgrades_drawer.visible = false
+	armory_drawer.visible = false
+	missions_drawer.visible = false
+
+func _toggle_drawer(target_drawer: Control) -> void:
+	SoundManager.play("click")
+	var will_open = not target_drawer.visible
+	_close_all_drawers()
+	target_drawer.visible = will_open
+
+func _on_play_pressed() -> void:
+	SoundManager.play("click")
+	_start_level(next_available_mission)
 
 func _refresh_ui() -> void:
 	coins_label.text = str(GameManager.coins)
 	sound_btn.text = "SOUND: ON" if GameManager.sound_enabled else "SOUND: OFF"
 
-	# Level buttons
+	# Calculate nearest available mission
 	var unl = GameManager.highest_unlocked_level
+	next_available_mission = clampi(unl, 1, 3)
+
+	# Primary Action Button: Clear, prominent, shows immediate next step
+	var mission_names = {
+		1: "MISSION 1: DOCKS ASSAULT",
+		2: "MISSION 2: THE DIVIDE",
+		3: "MISSION 3: FINAL TITAN"
+	}
+	var m_name = mission_names.get(next_available_mission, "MISSION " + str(next_available_mission))
+
+	if unl == 1 and GameManager.coins == 0:
+		play_btn.text = m_name + "\n▶ PLAY"
+	else:
+		play_btn.text = m_name + "\n▶ CONTINUE"
+
+	# Level buttons in Missions Drawer
 	lvl1_btn.disabled = false
 	lvl2_btn.disabled = (unl < 2)
 	lvl3_btn.disabled = (unl < 3)
 
-	lvl2_btn.text = "LEVEL 2" if unl >= 2 else "LOCKED (LVL 2)"
-	lvl3_btn.text = "LEVEL 3" if unl >= 3 else "LOCKED (LVL 3)"
+	lvl2_btn.text = "LEVEL 2: THE DIVIDE" if unl >= 2 else "LOCKED (LVL 2)"
+	lvl3_btn.text = "LEVEL 3: FINAL TITAN" if unl >= 3 else "LOCKED (LVL 3)"
 
 	# Upgrade Squad Size
 	var sq_cost = GameManager.get_upgrade_cost("squad")
@@ -81,7 +198,7 @@ func _setup_weapon_buttons() -> void:
 	for i in range(GameManager.WEAPON_DATA.size()):
 		var wdata = GameManager.WEAPON_DATA[i]
 		var btn = Button.new()
-		btn.custom_minimum_size = Vector2(180, 70)
+		btn.custom_minimum_size = Vector2(170, 75)
 		weapon_tab.add_child(btn)
 		var widx = i
 		btn.pressed.connect(func(): _on_weapon_clicked(widx))

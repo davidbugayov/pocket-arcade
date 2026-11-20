@@ -126,6 +126,21 @@ func trigger_damage_flash() -> void:
 	var tw = create_tween()
 	tw.tween_property(damage_flash_rect, "color", Color(1.0, 0.0, 0.0, 0.0), 0.25).set_trans(Tween.TRANS_SINE)
 
+func hide_tutorial_hint() -> void:
+	if tutorial_tween and tutorial_tween.is_valid():
+		tutorial_tween.kill()
+	if is_instance_valid(tutorial_panel):
+		tutorial_panel.visible = false
+
+func show_boss_alert(b_name: String) -> void:
+	if is_instance_valid(damage_flash_rect):
+		damage_flash_rect.color = Color(1.0, 0.15, 0.05, 0.40)
+		var flash_tw = create_tween()
+		flash_tw.tween_property(damage_flash_rect, "color", Color(1.0, 0.0, 0.0, 0.0), 0.45).set_trans(Tween.TRANS_SINE)
+
+	SoundManager.play("boss_alert")
+	show_toast("⚠️ WARNING: " + b_name.to_upper() + " DETECTED!")
+
 func show_toast(msg: String) -> void:
 	if not is_instance_valid(toast_label):
 		return

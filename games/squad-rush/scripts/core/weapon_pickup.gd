@@ -166,6 +166,17 @@ func _on_body_entered(body: Node3D) -> void:
 
 		weapon_collected.emit(weapon_id_to_grant, pickup_name)
 
+		# Screen toast & camera impact
+		var cur_node: Node = get_parent()
+		while cur_node:
+			if cur_node is LevelBase and is_instance_valid(cur_node.hud):
+				cur_node.hud.show_toast(pickup_name + " EQUIPPED!")
+				break
+			cur_node = cur_node.get_parent()
+
+		body.camera_shake_requested.emit(0.12)
+		_spawn_pickup_burst(global_position)
+
 		set_deferred("monitoring", false)
 
 		var tw = create_tween().set_parallel(true)
@@ -174,3 +185,27 @@ func _on_body_entered(body: Node3D) -> void:
 		tw.tween_property(label, "scale", Vector3(0.01, 0.01, 0.01), 0.2)
 		tw.tween_property(bg_badge, "scale", Vector3(0.01, 0.01, 0.01), 0.2)
 		tw.chain().tween_callback(func(): queue_free())
+
+func _spawn_pickup_burst(pos: Vector3) -> void:
+	var ring = MeshInstance3D.new()
+	var cyl = CylinderMesh.new()
+	cyl.top_radius = 1.0
+	cyl.bottom_radius = 1.0
+	cyl.height = 0.1
+	cyl.radial_segments = 16
+	ring.mesh = cyl
+	ring.position = Vector3(pos.x, 0.4, pos.z)
+
+	var mat = StandardMaterial3D.new()
+	mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(0.2, 0.95, 1.0, 0.9)
+	ring.material_override = mat
+
+	var parent = get_parent()
+	if parent:
+		parent.add_child(ring)
+		var tw = ring.create_tween().set_parallel(true)
+		tw.tween_property(ring, "scale", Vector3(3.5, 1.0, 3.5), 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(mat, "albedo_color:a", 0.0, 0.25)
+		tw.chain().tween_callback(func(): ring.queue_free())

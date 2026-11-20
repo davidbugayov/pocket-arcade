@@ -30,7 +30,7 @@ var punch_tween: Tween
 var multiplier_bullet_hits: int = 0
 var last_bullet_hit_time: float = -1.0
 
-const MAX_LABEL_DIST: float = 52.0
+const MAX_LABEL_DIST: float = 85.0 # Increased for early route and gate preview
 const MIN_HIT_INTERVAL: float = 0.22 # Controlled token rate prevents effortless over-upgrades
 const MAX_GATE_VALUE_ADD: int = 20
 const MAX_GATE_VALUE_MULT: int = 3
@@ -317,14 +317,49 @@ func apply_to_squad(squad: PlayerSquad) -> void:
 	match operation:
 		OperationType.ADD:
 			squad.add_members(value)
+			_spawn_celebration_ring(global_position, Color(0.2, 0.85, 1.0))
+			squad.camera_shake_requested.emit(0.12)
 		OperationType.MULTIPLY:
 			squad.multiply_members(value)
+			_spawn_celebration_ring(global_position, Color(0.2, 1.0, 0.4))
+			squad.camera_shake_requested.emit(0.15)
 		OperationType.SUBTRACT:
 			squad.remove_members(value)
 		OperationType.DIVIDE:
 			squad.divide_members(value)
 
+	var lvl = _get_level_parent()
+	if is_instance_valid(lvl) and is_instance_valid(lvl.hud):
+		if operation == OperationType.ADD:
+			lvl.hud.show_toast("+%d SQUAD!" % value)
+		elif operation == OperationType.MULTIPLY:
+			lvl.hud.show_toast("×%d MULTIPLY!" % value)
+
 	_fade_and_remove()
+
+func _spawn_celebration_ring(pos: Vector3, col: Color) -> void:
+	var ring = MeshInstance3D.new()
+	var cyl = CylinderMesh.new()
+	cyl.top_radius = 0.9
+	cyl.bottom_radius = 0.9
+	cyl.height = 0.08
+	cyl.radial_segments = 16
+	ring.mesh = cyl
+	ring.position = Vector3(pos.x, 0.35, pos.z)
+
+	var mat = StandardMaterial3D.new()
+	mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(col.r, col.g, col.b, 0.95)
+	ring.material_override = mat
+
+	var parent = get_parent()
+	if parent:
+		parent.add_child(ring)
+		var tw = ring.create_tween().set_parallel(true)
+		tw.tween_property(ring, "scale", Vector3(3.8, 1.0, 3.8), 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(mat, "albedo_color:a", 0.0, 0.28)
+		tw.chain().tween_callback(func(): ring.queue_free())
 
 func _get_level_parent() -> LevelBase:
 	var cur: Node = get_parent()
