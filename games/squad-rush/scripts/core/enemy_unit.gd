@@ -102,17 +102,37 @@ func _rebuild_type_visuals() -> void:
 	var var_id = 0
 	match enemy_type:
 		EnemyType.RUNNER:
-			var_id = 0 # Lean scout runner
+			var_id = 0 # Sleek scout runner with fins & thrusters
 			soldier_model.build_soldier(true, var_id)
 			soldier_model.equip_weapon(0)
+			soldier_model.rotation_degrees.x = 10.0 # Forward aggressive sprint tilt
+			if soldier_model.weapon_mount:
+				soldier_model.weapon_mount.visible = false # Melee rusher: no gun
+
+			# Dual forearm hydraulic ram spikes
+			for side in [-1, 1]:
+				var spike = MeshInstance3D.new()
+				var sp_mesh = BoxMesh.new()
+				sp_mesh.size = Vector3(0.06, 0.06, 0.32)
+				spike.mesh = sp_mesh
+				spike.position = Vector3(side * 0.22, 0.35, 0.16)
+				var sp_mat = StandardMaterial3D.new()
+				sp_mat.albedo_color = Color(0.85, 0.20, 0.10)
+				sp_mat.metallic = 0.80
+				spike.material_override = sp_mat
+				add_child(spike)
+
 		EnemyType.SHOOTER:
-			var_id = 1 # Rifle shooter
+			var_id = 1 # Combat android with targeting optic & antenna
 			soldier_model.build_soldier(true, var_id)
 			soldier_model.equip_weapon(0)
+
 		EnemyType.SHIELDER:
-			var_id = 1 # Heavy trooper with shield
+			var_id = 2 # Heavy fortified trooper with shield
 			soldier_model.build_soldier(true, var_id)
 			soldier_model.equip_weapon(0)
+			if soldier_model.weapon_mount:
+				soldier_model.weapon_mount.visible = false # Two-handed shield stance
 
 	muzzle_point = soldier_model.muzzle_point
 	gun_mesh = soldier_model.weapon_mount

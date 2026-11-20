@@ -14,11 +14,13 @@ var anim_time: float = 0.0
 
 signal weapon_collected(w_id: int, w_name: String)
 
-static var weapon_scenes = {
-	0: load("res://assets/models/rifle.glb"),
-	1: load("res://assets/models/scattergun.glb"),
-	2: load("res://assets/models/rotary_cannon.glb")
-}
+static var _weapon_scenes: Dictionary = {}
+static func get_weapon_model(w_id: int) -> PackedScene:
+	if _weapon_scenes.is_empty():
+		_weapon_scenes[0] = load("res://assets/models/rifle.glb")
+		_weapon_scenes[1] = load("res://assets/models/scattergun.glb")
+		_weapon_scenes[2] = load("res://assets/models/rotary_cannon.glb")
+	return _weapon_scenes.get(w_id)
 
 func _ready() -> void:
 	collision_layer = 0
@@ -126,7 +128,9 @@ func _update_weapon_model() -> void:
 	for c in weapon_display_node.get_children():
 		c.queue_free()
 
-	var scene: PackedScene = weapon_scenes.get(weapon_id_to_grant, weapon_scenes[1])
+	var scene: PackedScene = get_weapon_model(weapon_id_to_grant)
+	if scene == null:
+		scene = get_weapon_model(1)
 	if scene:
 		var w = scene.instantiate()
 		w.scale = Vector3(1.1, 1.1, 1.1)

@@ -27,6 +27,9 @@ func _ready() -> void:
 	test_stylized_soldier_visuals_and_performance()
 	test_enemy_types_and_roles()
 	test_weapon_roles_and_run_separation()
+	test_rescue_barrel_mechanic()
+	test_level2_and_level3_balance()
+	test_candidate_models_and_comparison_scene()
 
 	print("====================================================")
 	print("  TEST RESULTS: Passed: %d / %d (Failed: %d)" % [passed_tests, total_tests, failed_tests])
@@ -566,6 +569,7 @@ func test_enemy_types_and_roles() -> void:
 	assert_test(runner.moves_forward == true and runner.move_speed >= 5.0, "Runner moves forward aggressively (>= 5.0 m/s)")
 	assert_test(runner.damage_to_player == 2, "Runner inflicts 2 soldier casualties on impact")
 	assert_test(runner.telegraph_laser == null, "Runner does not shoot ranged bullets")
+	assert_test(runner.soldier_model.variant == 0, "Runner uses aerodynamic scout chassis")
 
 	# 2. Shooter
 	var shooter = EnemyUnit.new()
@@ -574,6 +578,7 @@ func test_enemy_types_and_roles() -> void:
 	assert_test(shooter.enemy_type == EnemyUnit.EnemyType.SHOOTER, "Enemy type is SHOOTER")
 	assert_test(shooter.telegraph_laser != null, "Shooter possesses visible aiming telegraph laser")
 	assert_test(shooter.damage_to_player == 1, "Shooter deals 1 soldier casualty per hit")
+	assert_test(shooter.soldier_model.variant == 1, "Shooter uses combat android chassis with targeting optic")
 
 	# 3. Heavy Shielder
 	var shielder = EnemyUnit.new()
@@ -583,6 +588,7 @@ func test_enemy_types_and_roles() -> void:
 	assert_test(shielder.shield_mesh != null, "Shielder is equipped with a wide physical ballistic riot shield")
 	assert_test(shielder.max_hp >= 50.0, "Shielder has high HP barrier (>= 50 HP)")
 	assert_test(shielder.damage_to_player == 3, "Shielder contact damage is heavy (3 soldiers)")
+	assert_test(shielder.soldier_model.variant == 2, "Shielder uses heavy fortified chassis")
 
 	runner.free()
 	shooter.free()
@@ -618,3 +624,136 @@ func test_weapon_roles_and_run_separation() -> void:
 	assert_test(rifle["bullet_speed"] > shotgun["bullet_speed"], "Assault rifle offers superior bullet velocity and precision over shotgun")
 	assert_test(shotgun["spread_count"] == 4, "Shotgun fires a heavy 4-pellet spread for close-quarters devastation")
 	assert_test(minigun["fire_delay"] <= 0.10, "Minigun delivers ultra-fast fire rate (<= 0.10s) for continuous suppression")
+
+func test_rescue_barrel_mechanic() -> void:
+	print("\n--- Test: Allied Rescue Barrel Mechanic ---")
+
+	var squad = PlayerSquad.new()
+	squad.add_to_group("player")
+	add_child(squad)
+	squad.set_squad_size(4)
+
+	var rescue_bar = Obstacle.new()
+	add_child(rescue_bar)
+	rescue_bar.setup_rescue(2, 18.0)
+
+	assert_test(rescue_bar.bonus_soldiers_on_destroy == 2, "Rescue barrel configured with 2 bonus soldiers")
+	assert_test(rescue_bar.max_hp == 18.0, "Rescue barrel HP is 18.0")
+
+	# Destroy barrel by bullets (take_damage)
+	rescue_bar.take_damage(20.0)
+	assert_test(rescue_bar.is_destroyed == true, "Rescue barrel destroyed by bullet damage")
+	assert_test(squad.squad_count == 6, "Destroying rescue barrel adds 2 soldiers to squad (4 -> 6)")
+
+	# Second barrel: test that crashing with squad does NOT give bonus soldiers
+	var crash_bar = Obstacle.new()
+	add_child(crash_bar)
+	crash_bar.setup_rescue(2, 18.0)
+	crash_bar.on_player_squad_collided(squad)
+	assert_test(squad.squad_count < 6, "Colliding with rescue barrel inflicts collision damage and does NOT grant bonus soldiers")
+
+	squad.free()
+	rescue_bar.free()
+	crash_bar.free()
+
+func test_level2_and_level3_balance() -> void:
+	print("\n--- Test: Level 2 & Level 3 Balance & Boss Combat ---")
+
+	# 1. Level 2 (Heavy War Tank, 1400 HP)
+	var tank = BossUnit.new()
+	add_child(tank)
+	tank.setup("Heavy War Tank", 1400.0, 220, BossUnit.BossType.TANK)
+	assert_test(tank.boss_type == BossUnit.BossType.TANK, "Boss 2 is TANK")
+	assert_test(tank.max_hp == 1400.0, "Heavy War Tank HP is 1400.0")
+
+	# Simulate squad with 18 soldiers using Minigun (1.0 dmg every 0.08s = 12.5 DPS per shooter)
+	var active_shooters_2 = mini(10, 18)
+	var effective_firepower_2 = float(active_shooters_2) + pow(float(18 - active_shooters_2), 0.62) * 1.05
+	var minigun_dps = 1.0 / 0.08
+	var squad_dps_2 = effective_firepower_2 * minigun_dps * 0.75 # 75% accuracy
+	var tank_ttk = 1400.0 / squad_dps_2
+	print("  Calculated Tank TTK with 18 soldiers (Minigun): %.2fs (DPS: %.1f)" % [tank_ttk, squad_dps_2])
+	assert_test(tank_ttk >= 8.0 and tank_ttk <= 14.0, "Tank boss combat lasts 8-14s (actual: %.2fs)" % tank_ttk)
+
+	tank.activate()
+	var tank_attacks = {"count": 0}
+	tank.boss_shot_fired.connect(func(_p, _d, _dmg): tank_attacks["count"] += 1)
+	var sim_t = 0.0
+	while tank.current_hp > 0.0 and sim_t < 16.0:
+		sim_t += 0.05
+		tank._physics_process(0.05)
+		tank.take_damage(squad_dps_2 * 0.05)
+	assert_test(tank.current_hp <= 0.0, "Heavy War Tank defeated in combat simulation")
+	assert_test(tank_attacks["count"] >= 2, "Tank demonstrated multiple attacks (observed: %d shots)" % tank_attacks["count"])
+	tank.free()
+
+	# 2. Level 3 (Dread Titan, 1950 HP)
+	var titan = BossUnit.new()
+	add_child(titan)
+	titan.setup("Dread Titan", 1950.0, 350, BossUnit.BossType.DREAD_TITAN)
+	assert_test(titan.boss_type == BossUnit.BossType.DREAD_TITAN, "Boss 3 is DREAD_TITAN")
+	assert_test(titan.max_hp == 1950.0, "Dread Titan HP is 1950.0")
+
+	# Simulate squad with 28 soldiers using Minigun
+	var active_shooters_3 = mini(10, 28)
+	var effective_firepower_3 = float(active_shooters_3) + pow(float(28 - active_shooters_3), 0.62) * 1.05
+	var squad_dps_3 = effective_firepower_3 * minigun_dps * 0.75
+	var titan_ttk = 1950.0 / squad_dps_3
+	print("  Calculated Titan TTK with 28 soldiers: %.2fs (DPS: %.1f)" % [titan_ttk, squad_dps_3])
+	assert_test(titan_ttk >= 10.0 and titan_ttk <= 16.0, "Titan boss combat lasts 10-16s (actual: %.2fs)" % titan_ttk)
+
+	titan.activate()
+	var titan_attacks = {"count": 0}
+	titan.boss_shot_fired.connect(func(_p, _d, _dmg): titan_attacks["count"] += 1)
+	sim_t = 0.0
+	while titan.current_hp > 0.0 and sim_t < 18.0:
+		sim_t += 0.05
+		titan._physics_process(0.05)
+		titan.take_damage(squad_dps_3 * 0.05)
+	assert_test(titan.current_hp <= 0.0, "Dread Titan defeated in combat simulation")
+	assert_test(titan_attacks["count"] >= 2, "Dread Titan demonstrated multiple attacks (observed: %d shots)" % titan_attacks["count"])
+	titan.free()
+
+func test_candidate_models_and_comparison_scene() -> void:
+	print("\n--- Test: Candidate Models & Model Comparison Scene ---")
+
+	# 1. Candidate A: Quaternius Toon Infantry
+	var p_a = load("res://assets/models/character_soldier.gltf")
+	assert_test(p_a != null, "Candidate A (character_soldier.gltf) loads cleanly")
+	if p_a:
+		var inst_a = p_a.instantiate()
+		var ap_a = inst_a.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		assert_test(ap_a != null, "Candidate A has AnimationPlayer")
+		if ap_a:
+			assert_test(ap_a.has_animation("Run") or ap_a.has_animation("Run_Shoot"), "Candidate A has running combat animations")
+		inst_a.free()
+
+	# 2. Candidate B: Kenney Compact Robot
+	var p_b = load("res://assets/models/compact_bot.glb")
+	assert_test(p_b != null, "Candidate B (compact_bot.glb) loads cleanly")
+	if p_b:
+		var inst_b = p_b.instantiate()
+		var ap_b = inst_b.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		assert_test(ap_b != null, "Candidate B has AnimationPlayer")
+		if ap_b:
+			assert_test(ap_b.has_animation("walk"), "Candidate B has walking animation")
+		inst_b.free()
+
+	# 3. Model Comparison Scene
+	var comp_scene = load("res://scenes/model_comparison.tscn")
+	assert_test(comp_scene != null, "Model comparison scene loads cleanly")
+	if comp_scene:
+		var comp_inst = comp_scene.instantiate()
+		add_child(comp_inst)
+		assert_test(comp_inst.has_node("Camera3D"), "Comparison scene contains Camera3D")
+		comp_inst.free()
+
+	# 4. Main Menu Compare Button
+	var mm_scene = load("res://scenes/main_menu.tscn")
+	assert_test(mm_scene != null, "Main menu scene loads cleanly")
+	if mm_scene:
+		var mm_inst = mm_scene.instantiate()
+		add_child(mm_inst)
+		var cmp_btn = mm_inst.get_node_or_null("TopPanel/CompareBtn")
+		assert_test(cmp_btn != null, "Main menu contains CompareBtn")
+		mm_inst.free()

@@ -59,11 +59,13 @@ var tank_target_x: float = 0.0
 # Dread Titan attack alternation
 var titan_attack_toggle: bool = false
 
-static var boss_models = {
-	BossType.HEAVY_ROBOT: load("res://assets/models/service_robot.glb"),
-	BossType.TANK: load("res://assets/models/medium_tank.glb"),
-	BossType.DREAD_TITAN: load("res://assets/models/cargo_walker.glb")
-}
+static var _boss_models: Dictionary = {}
+static func get_boss_model(b_type: BossType) -> PackedScene:
+	if _boss_models.is_empty():
+		_boss_models[BossType.HEAVY_ROBOT] = load("res://assets/models/service_robot.glb")
+		_boss_models[BossType.TANK] = load("res://assets/models/medium_tank.glb")
+		_boss_models[BossType.DREAD_TITAN] = load("res://assets/models/cargo_walker.glb")
+	return _boss_models.get(b_type)
 
 func _ready() -> void:
 	collision_layer = 16
@@ -107,7 +109,7 @@ func _rebuild_boss_visuals() -> void:
 
 	collision_shape = CollisionShape3D.new()
 
-	var scene: PackedScene = boss_models.get(boss_type, null)
+	var scene: PackedScene = get_boss_model(boss_type)
 	model_instance = scene.instantiate() if scene else null
 	if model_instance:
 		boss_mesh_root.add_child(model_instance)

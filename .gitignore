@@ -27,3 +27,8 @@ graphify-out/
 .playwright-mcp/
 dist/
 *.png.local
+
+# Heavy external binary packages
+references/**/*.zip
+references/**/*.apk
+references/**/*.xapk

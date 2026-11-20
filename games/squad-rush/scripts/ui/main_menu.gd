@@ -5,6 +5,7 @@ class_name MainMenu
 # UI References
 @onready var coins_label: Label = $TopPanel/CoinBox/CoinsLabel
 @onready var sound_btn: Button = $TopPanel/SoundBtn
+@onready var compare_btn: Button = $TopPanel.get_node_or_null("CompareBtn")
 
 @onready var lvl1_btn: Button = $VBox/LevelSelect/Lvl1Btn
 @onready var lvl2_btn: Button = $VBox/LevelSelect/Lvl2Btn
@@ -34,6 +35,8 @@ func _ready() -> void:
 	upg_fire_btn.pressed.connect(func(): _buy_upgrade("fire_rate"))
 
 	sound_btn.pressed.connect(_on_sound_toggled)
+	if compare_btn:
+		compare_btn.pressed.connect(_on_compare_clicked)
 
 	_setup_weapon_buttons()
 	_refresh_ui()
@@ -125,6 +128,10 @@ func _on_sound_toggled() -> void:
 	GameManager.toggle_sound()
 	sound_btn.text = "SOUND: ON" if GameManager.sound_enabled else "SOUND: OFF"
 	SoundManager.play("click")
+
+func _on_compare_clicked() -> void:
+	SoundManager.play("click")
+	get_tree().change_scene_to_file("res://scenes/model_comparison.tscn")
 
 func _on_coins_changed(_new_coins: int) -> void:
 	_refresh_ui()

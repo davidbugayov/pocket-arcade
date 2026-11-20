@@ -295,70 +295,116 @@ static func _generate_upper_body_mesh(v: int, is_en: bool = false) -> ArrayMesh:
 		ear_pad.size = Vector3(0.06, 0.12, 0.14)
 		_append_colored_primitive(st, ear_pad, Transform3D(Basis(), Vector3(side * 0.22, 0.24, 0)), c_helmet)
 
-	# 7. Coherent Silhouette Variations (Instantly distinguishable from behind and camera!)
-	match v:
-		0: # Variant 0: Regular Rifleman — Sleek tactical harness, combat knife on left shoulder, rear utility pouch
-			# Left shoulder combat knife sheath
-			var knife = BoxMesh.new()
-			knife.size = Vector3(0.04, 0.14, 0.05)
-			_append_colored_primitive(st, knife, Transform3D(Basis(Vector3(0, 0, 1), deg_to_rad(-15)), Vector3(-0.16, 0.18, 0.12)), COL_GUN_RECEIVER)
+	# 7. Coherent Silhouette Variations & Role Differentiation
+	if is_en:
+		# ENEMY ROLES: 0 = RUNNER, 1 = SHOOTER, 2 = SHIELDER
+		match v:
+			0: # Enemy RUNNER: Aerodynamic swept-back twin fins, dual rear rocket thruster vents
+				# Swept-back aerodynamic helmet fins
+				for side in [-1, 1]:
+					var fin = BoxMesh.new()
+					fin.size = Vector3(0.03, 0.14, 0.22)
+					var fin_rot = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(-28)), Vector3(side * 0.13, 0.38, -0.05))
+					_append_colored_primitive(st, fin, fin_rot, c_helmet)
 
-			# Rear waist utility pouches (visible from behind!)
-			for p_off in [-0.07, 0.07]:
-				var pouch = BoxMesh.new()
-				pouch.size = Vector3(0.08, 0.08, 0.06)
-				_append_colored_primitive(st, pouch, Transform3D(Basis(), Vector3(p_off, -0.14, -0.17)), c_gear)
+				# Twin rear rocket booster thruster housings
+				for side in [-0.08, 0.08]:
+					var thruster = _make_cylinder(0.045, 0.055, 0.20, 8)
+					var t_rot = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(-18)), Vector3(side, 0.04, -0.16))
+					_append_colored_primitive(st, thruster, t_rot, COL_GUN_RECEIVER)
+					# Glowing thermal exhaust core (instant high-contrast cue from behind!)
+					var flame = _make_cylinder(0.032, 0.038, 0.04, 6)
+					var f_rot = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(-18)), Vector3(side, -0.06, -0.19))
+					_append_colored_primitive(st, flame, f_rot, c_visor)
 
-		1: # Variant 1: Heavy Trooper — Wide reinforced shoulder pauldrons & heavy neck gorget collar
-			# Reinforced heavy neck gorget collar (visible in front and side)
-			var gorget = BoxMesh.new()
-			gorget.size = Vector3(0.30, 0.08, 0.24)
-			_append_colored_primitive(st, gorget, Transform3D(Basis(), Vector3(0, 0.18, 0.02)), c_armor)
+			1: # Enemy SHOOTER: Upright military chassis, Cyclops targeting optic, shoulder radio mast
+				# Tall communications antenna mast on left shoulder with glowing signal tip
+				var antenna = _make_cylinder(0.012, 0.016, 0.44, 6)
+				_append_colored_primitive(st, antenna, Transform3D(Basis(), Vector3(-0.16, 0.38, -0.12)), COL_GUN_BARREL)
+				var tip = _make_sphere(0.024, 0.045, 6, 3)
+				_append_colored_primitive(st, tip, Transform3D(Basis(), Vector3(-0.16, 0.60, -0.12)), c_visor)
 
-			# Broad heavy shoulder armor plates (clearly widens shoulders from behind!)
-			for side in [-1, 1]:
-				var h_plate = BoxMesh.new()
-				h_plate.size = Vector3(0.16, 0.09, 0.22)
-				_append_colored_primitive(st, h_plate, Transform3D(Basis(Vector3(0, 0, 1), deg_to_rad(side * -15)), Vector3(side * 0.26, 0.16, 0.01)), c_armor)
+				# Cyclops targeting monocle optic on forehead
+				var monocle = _make_cylinder(0.035, 0.035, 0.08, 8)
+				var m_rot = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(90)), Vector3(0.0, 0.36, 0.20))
+				_append_colored_primitive(st, monocle, m_rot, COL_GUN_RECEIVER)
+				var lens = _make_sphere(0.028, 0.035, 6, 4)
+				_append_colored_primitive(st, lens, Transform3D(Basis(), Vector3(0.0, 0.36, 0.24)), c_visor)
 
-			# Heavy armored rear battery pack with status diode
-			var battery = BoxMesh.new()
-			battery.size = Vector3(0.22, 0.22, 0.10)
-			_append_colored_primitive(st, battery, Transform3D(Basis(), Vector3(0, 0.02, -0.16)), COL_GUN_RECEIVER)
-			var diode = BoxMesh.new()
-			diode.size = Vector3(0.06, 0.04, 0.03)
-			var diode_col = Color(0.2, 0.9, 0.4) if not is_en else Color(1.0, 0.3, 0.1)
-			_append_colored_primitive(st, diode, Transform3D(Basis(), Vector3(0.06, 0.08, -0.215)), diode_col)
+				# Right shoulder ammo feed conduit
+				var conduit = BoxMesh.new()
+				conduit.size = Vector3(0.08, 0.18, 0.10)
+				_append_colored_primitive(st, conduit, Transform3D(Basis(), Vector3(0.18, 0.08, -0.10)), c_gear)
 
-			# Heavy chest magazine pouches
-			for side in [-0.07, 0.07]:
-				var mag = BoxMesh.new()
-				mag.size = Vector3(0.06, 0.11, 0.05)
-				_append_colored_primitive(st, mag, Transform3D(Basis(), Vector3(side, 0.01, 0.18)), c_gear)
+			2: # Enemy SHIELDER: Massive fortified torso, heavy collar gorget, dual oversized pauldrons
+				# Heavy neck collar gorget
+				var gorget = BoxMesh.new()
+				gorget.size = Vector3(0.36, 0.10, 0.26)
+				_append_colored_primitive(st, gorget, Transform3D(Basis(), Vector3(0, 0.18, 0.02)), c_armor)
 
-		2: # Variant 2: Specialist — Compact tactical backpack with radio antenna mast (prominent from behind!)
-			# Rear communication survival backpack
-			var pack = BoxMesh.new()
-			pack.size = Vector3(0.24, 0.28, 0.14)
-			_append_colored_primitive(st, pack, Transform3D(Basis(), Vector3(0, 0.05, -0.18)), c_pack)
+				# Massive reinforced shoulder armor plates (clearly widens silhouette)
+				for side in [-1, 1]:
+					var h_plate = BoxMesh.new()
+					h_plate.size = Vector3(0.20, 0.12, 0.26)
+					var p_rot = Transform3D(Basis(Vector3(0, 0, 1), deg_to_rad(side * -18)), Vector3(side * 0.28, 0.18, 0.01))
+					_append_colored_primitive(st, h_plate, p_rot, c_armor)
 
-			# Backpack straps over shoulders
-			for side in [-0.11, 0.11]:
-				var strap = BoxMesh.new()
-				strap.size = Vector3(0.04, 0.28, 0.02)
-				_append_colored_primitive(st, strap, Transform3D(Basis(), Vector3(side, 0.08, -0.01)), c_gear)
+				# Heavy armored back generator pack with status diode
+				var pack = BoxMesh.new()
+				pack.size = Vector3(0.26, 0.24, 0.12)
+				_append_colored_primitive(st, pack, Transform3D(Basis(), Vector3(0, 0.04, -0.16)), COL_GUN_RECEIVER)
+				var diode = BoxMesh.new()
+				diode.size = Vector3(0.07, 0.05, 0.03)
+				_append_colored_primitive(st, diode, Transform3D(Basis(), Vector3(0.08, 0.10, -0.225)), c_visor)
 
-			# Slender tactical radio antenna mast extending up from backpack with luminous tip
-			var antenna = _make_cylinder(0.012, 0.018, 0.48, 6)
-			_append_colored_primitive(st, antenna, Transform3D(Basis(), Vector3(-0.09, 0.40, -0.22)), COL_GUN_BARREL)
-			var tip = _make_sphere(0.025, 0.05, 6, 3)
-			_append_colored_primitive(st, tip, Transform3D(Basis(), Vector3(-0.09, 0.65, -0.22)), c_visor)
+	else:
+		# ALLIED VARIANTS: 0 = Standard Combat Android, 1 = Heavy Trooper, 2 = Tactical Specialist
+		match v:
+			0: # Allied Standard Trooper: Center helmet antenna mast (Kenney robot signature), rear utility pouch
+				# Center antenna mast extending straight up from helmet dome
+				var antenna = _make_cylinder(0.012, 0.016, 0.30, 6)
+				_append_colored_primitive(st, antenna, Transform3D(Basis(), Vector3(0, 0.50, 0)), COL_GUN_BARREL)
+				var tip = _make_sphere(0.025, 0.045, 6, 3)
+				_append_colored_primitive(st, tip, Transform3D(Basis(), Vector3(0, 0.65, 0)), c_visor)
 
-			# Brow sensor goggles on helmet
-			for g_side in [-0.06, 0.06]:
-				var goggle = _make_cylinder(0.025, 0.025, 0.05, 6)
-				var g_rot = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(90)), Vector3(g_side, 0.38, 0.14))
-				_append_colored_primitive(st, goggle, g_rot, COL_GUN_RECEIVER)
+				# Rear waist utility pouches (visible from behind!)
+				for p_off in [-0.07, 0.07]:
+					var pouch = BoxMesh.new()
+					pouch.size = Vector3(0.08, 0.08, 0.06)
+					_append_colored_primitive(st, pouch, Transform3D(Basis(), Vector3(p_off, -0.14, -0.17)), c_gear)
+
+			1: # Allied Heavy Trooper: Reinforced neck gorget, broad heavy shoulder pauldrons & rear battery
+				var gorget = BoxMesh.new()
+				gorget.size = Vector3(0.30, 0.08, 0.24)
+				_append_colored_primitive(st, gorget, Transform3D(Basis(), Vector3(0, 0.18, 0.02)), c_armor)
+
+				for side in [-1, 1]:
+					var h_plate = BoxMesh.new()
+					h_plate.size = Vector3(0.16, 0.09, 0.22)
+					_append_colored_primitive(st, h_plate, Transform3D(Basis(Vector3(0, 0, 1), deg_to_rad(side * -15)), Vector3(side * 0.26, 0.16, 0.01)), c_armor)
+
+				var battery = BoxMesh.new()
+				battery.size = Vector3(0.22, 0.22, 0.10)
+				_append_colored_primitive(st, battery, Transform3D(Basis(), Vector3(0, 0.02, -0.16)), COL_GUN_RECEIVER)
+				var diode = BoxMesh.new()
+				diode.size = Vector3(0.06, 0.04, 0.03)
+				_append_colored_primitive(st, diode, Transform3D(Basis(), Vector3(0.06, 0.08, -0.215)), c_visor)
+
+			2: # Allied Specialist: Twin communication antennae, tactical backpack, brow sensor goggles
+				var pack = BoxMesh.new()
+				pack.size = Vector3(0.24, 0.28, 0.14)
+				_append_colored_primitive(st, pack, Transform3D(Basis(), Vector3(0, 0.05, -0.18)), c_pack)
+
+				# Slender tactical radio antenna mast extending up from backpack with luminous tip
+				var antenna = _make_cylinder(0.012, 0.018, 0.48, 6)
+				_append_colored_primitive(st, antenna, Transform3D(Basis(), Vector3(-0.09, 0.40, -0.22)), COL_GUN_BARREL)
+				var tip = _make_sphere(0.025, 0.05, 6, 3)
+				_append_colored_primitive(st, tip, Transform3D(Basis(), Vector3(-0.09, 0.65, -0.22)), c_visor)
+
+				for g_side in [-0.06, 0.06]:
+					var goggle = _make_cylinder(0.025, 0.025, 0.05, 6)
+					var g_rot = Transform3D(Basis(Vector3(1, 0, 0), deg_to_rad(90)), Vector3(g_side, 0.38, 0.14))
+					_append_colored_primitive(st, goggle, g_rot, COL_GUN_RECEIVER)
 
 	return st.commit()
 

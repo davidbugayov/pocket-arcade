@@ -12,6 +12,7 @@ enum ObstacleType {
 @export var obstacle_type: ObstacleType = ObstacleType.TIRE_STACK
 @export var max_hp: float = 20.0
 @export var coin_reward: int = 5
+@export var bonus_soldiers_on_destroy: int = 0
 
 var current_hp: float = 20.0
 var hp_label: Label3D
@@ -29,12 +30,14 @@ const MAX_HP_DIST: float = 34.0
 
 signal destroyed(pos: Vector3, reward: int)
 
-static var model_scenes = {
-	ObstacleType.TIRE_STACK: load("res://assets/models/tyre_stack.glb"),
-	ObstacleType.CRATE: load("res://assets/models/ammunition_crate.glb"),
-	ObstacleType.BARREL: load("res://assets/models/barrel.glb"),
-	ObstacleType.CONCRETE_BLOCK: load("res://assets/models/jersey_barrier.glb")
-}
+static var _model_scenes: Dictionary = {}
+static func get_obstacle_model(o_type: ObstacleType) -> PackedScene:
+	if _model_scenes.is_empty():
+		_model_scenes[ObstacleType.TIRE_STACK] = load("res://assets/models/tyre_stack.glb")
+		_model_scenes[ObstacleType.CRATE] = load("res://assets/models/ammunition_crate.glb")
+		_model_scenes[ObstacleType.BARREL] = load("res://assets/models/barrel.glb")
+		_model_scenes[ObstacleType.CONCRETE_BLOCK] = load("res://assets/models/jersey_barrier.glb")
+	return _model_scenes.get(o_type)
 
 func _ready() -> void:
 	collision_layer = 2 # Obstacle layer
@@ -50,6 +53,19 @@ func setup(p_type: ObstacleType, p_hp: float, p_coins: int) -> void:
 	max_hp = p_hp
 	current_hp = max_hp
 	coin_reward = p_coins
+	bonus_soldiers_on_destroy = 0
+
+	if is_inside_tree():
+		_rebuild_visuals()
+		_update_hp_display()
+		_update_detector_shape()
+
+func setup_rescue(p_soldiers: int = 2, p_hp: float = 18.0) -> void:
+	obstacle_type = ObstacleType.BARREL
+	max_hp = p_hp
+	current_hp = max_hp
+	bonus_soldiers_on_destroy = p_soldiers
+	coin_reward = 15
 
 	if is_inside_tree():
 		_rebuild_visuals()
@@ -67,7 +83,7 @@ func _rebuild_visuals() -> void:
 
 	collision_shape = CollisionShape3D.new()
 
-	var scene: PackedScene = model_scenes.get(obstacle_type, null)
+	var scene: PackedScene = get_obstacle_model(obstacle_type)
 	var model_inst: Node3D = scene.instantiate() if scene else null
 
 	match obstacle_type:
@@ -103,6 +119,14 @@ func _rebuild_visuals() -> void:
 			if model_inst:
 				model_inst.scale = Vector3(1.35, 1.35, 1.35)
 				mesh_root.add_child(model_inst)
+
+			if bonus_soldiers_on_destroy > 0:
+				var ally_icon = StylizedSoldier.new()
+				ally_icon.scale = Vector3(0.52, 0.52, 0.52)
+				ally_icon.position = Vector3(0, 1.30, 0)
+				mesh_root.add_child(ally_icon)
+				ally_icon.setup_team(false)
+				ally_icon.build_soldier(false, 0)
 
 		ObstacleType.CONCRETE_BLOCK:
 			var shape = BoxShape3D.new()
@@ -217,7 +241,12 @@ func _physics_process(_delta: float) -> void:
 
 func _update_hp_display() -> void:
 	if is_instance_valid(hp_label):
-		hp_label.text = str(maxi(0, int(ceil(current_hp))))
+		if bonus_soldiers_on_destroy > 0:
+			hp_label.text = "+%d RESCUE\n%d" % [bonus_soldiers_on_destroy, maxi(0, int(ceil(current_hp)))]
+			hp_label.modulate = Color(0.2, 1.0, 0.4)
+		else:
+			hp_label.text = str(maxi(0, int(ceil(current_hp))))
+			hp_label.modulate = Color(1.0, 0.92, 0.15)
 
 func take_damage(amount: float) -> void:
 	if is_destroyed or current_hp <= 0:
@@ -275,6 +304,13 @@ func _destroy_obstacle() -> void:
 	GameManager.add_coins(coin_reward)
 	GameManager.run_kills += 1
 	destroyed.emit(global_position, coin_reward)
+
+	if bonus_soldiers_on_destroy > 0 and not has_collided_with_squad:
+		var p_nodes = get_tree().get_nodes_in_group("player")
+		if p_nodes.size() > 0:
+			var squad = p_nodes[0] as PlayerSquad
+			if is_instance_valid(squad):
+				squad.add_members(bonus_soldiers_on_destroy)
 
 	var tween = create_tween()
 	if is_instance_valid(mesh_root):

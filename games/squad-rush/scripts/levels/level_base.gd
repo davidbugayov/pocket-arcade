@@ -236,6 +236,13 @@ func spawn_obstacle(pos: Vector3, type: Obstacle.ObstacleType, hp: float, coins:
 	obstacles_container.add_child(obs)
 	return obs
 
+func spawn_rescue_barrel(pos: Vector3, bonus_soldiers: int = 2, hp: float = 18.0) -> Obstacle:
+	var obs = Obstacle.new()
+	obs.setup_rescue(bonus_soldiers, hp)
+	obs.position = pos
+	obstacles_container.add_child(obs)
+	return obs
+
 func spawn_enemy(pos: Vector3, hp: float, coins: int, moves: bool = false, type: int = 1) -> EnemyUnit:
 	var enemy = EnemyUnit.new()
 	enemy.setup(hp, coins, moves, type)
